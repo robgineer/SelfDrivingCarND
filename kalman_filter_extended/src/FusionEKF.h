@@ -32,6 +32,11 @@ public:
   KalmanFilter ekf_;
 
 private:
+
+  // define acceleration noise (x and y direction)
+  int noise_ax;
+  int noise_ay;
+
   // check whether the tracking toolbox was initialized or not (first measurement)
   bool is_initialized_;
 
