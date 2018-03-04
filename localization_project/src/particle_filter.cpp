@@ -65,7 +65,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// create randomizer for noise
 	default_random_engine randomizer;
 
-	// create normal distributions with mean = 0 and specific std. deviations
+	// create normal distributions with mean = 0 and specific std. deviations (used for Gaussian noise)
 	normal_distribution<double> dist_x(0, std_pos[0]);
 	normal_distribution<double> dist_y(0, std_pos[1]);
 	normal_distribution<double> dist_theta(0, std_pos[2]);
@@ -73,7 +73,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// iterate through amount of defined particles
 	for(unsigned int i = 0; i < num_particles; i++)
 	{
-		// special case: yaw rate is 0 (rounding due to floating point inaccuracy)
+		// special case: yaw rate is 0 (represented as x < 0.0001 due to floating point inaccuracy)
 		if ( fabs(yaw_rate) < 0.0001 )
 		{
 			particles[i].x = particles[i].x + velocity * delta_t * cos(particles[i].theta);
@@ -82,9 +82,11 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		// normal case: yaw rate is > 0
 		else
 		{
-			particles[i].x = particles[i].x + velocity / yaw_rate * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
-			particles[i].y = particles[i].y + velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
-			particles[i].theta = particles[i].theta + yaw_rate * delta_t;
+			particles[i].x 		= particles[i].x + velocity / yaw_rate *
+									(sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
+			particles[i].y 		= particles[i].y + velocity / yaw_rate *
+									(cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
+			particles[i].theta 	= particles[i].theta + yaw_rate * delta_t;
 		}
 		// add Gaussian noise
 		particles[i].x 		= particles[i].x 	+ dist_x(randomizer);
@@ -105,7 +107,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	for(unsigned int i = 0; i < observations.size(); i++)
 	{
 		// set a high initial minimum distance
-		minimum_distance = 99999;
+		minimum_distance = 999;
 
 		// iterate through all predictions
 		for(unsigned int j = 0; j < predicted.size(); j++)
@@ -142,9 +144,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	for(int i = 0; i < num_particles; i++)
 	{
 		// store attributes for easy access
-		double particle_x = particles[i].x;
-		double particle_y = particles[i].y;
-		double particle_theta = particles[i].theta;
+		double particle_x 		= particles[i].x;
+		double particle_y 		= particles[i].y;
+		double particle_theta 	= particles[i].theta;
 
 		// create a list of landmarks that are visible by the vehicles sensors
 		vector<LandmarkObs> filtered_map_landmarks;
@@ -153,9 +155,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		for(unsigned int j = 0; j < map_landmarks.landmark_list.size(); j++)
 		{
 			// store attributes for easy access
-			int landmark_id = map_landmarks.landmark_list[j].id_i;
-			float landmark_x = map_landmarks.landmark_list[j].x_f;
-			float landmark_y = map_landmarks.landmark_list[j].y_f;
+			int landmark_id 		= map_landmarks.landmark_list[j].id_i;
+			float landmark_x 	= map_landmarks.landmark_list[j].x_f;
+			float landmark_y 	= map_landmarks.landmark_list[j].y_f;
 
 			// TODO: convert float to double prior to distance calculation
 			//get Eucledian distance from particle to landmark in map
@@ -183,10 +185,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			observations_in_map_coordinates.push_back(transformed_ob);
 		}
 
-		// update observations with nearest IDs of nearest (in range) MAP landmarks
+		// update observations with IDs of nearest (in range) MAP landmarks
 		dataAssociation(filtered_map_landmarks, observations_in_map_coordinates);
 
-		// re-init weight of current particle (probability that the vehicle is at the position of this particle is 100%)
+		// re-init weight of current particle (probability that the vehicle is at the position of the current particle is 100%)
 		particles[i].weight = 1.0;
 
 		// extract sigma values for x and y
@@ -210,8 +212,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 					// calculate multivariate Gaussian probability
 					double weight = (1/(2 * M_PI * sigma_x * sigma_y)) *
-							exp(- (	(pow(obs_x - landmark_x, 2)) / (2 * pow(sigma_x, 2))
-								  + (pow(obs_y - landmark_y, 2)) / (2 * pow(sigma_y, 2)) ) );
+							exp(- (	(pow(obs_x - landmark_x, 2)) / (2 * pow(sigma_x, 2)) +
+								    (pow(obs_y - landmark_y, 2)) / (2 * pow(sigma_y, 2)) ) );
 
 					// update probability of vehicle being at the particles position
 					particles[i].weight = particles[i].weight * weight;
@@ -226,7 +228,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 void ParticleFilter::resample() {
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
-	//This elegant solution has been taken over from the Q+A video.
+	/*** This elegant solution has been taken over from the Q+A video.  ***/
 
 	// create randomizer for noise
 	default_random_engine randomizer;
