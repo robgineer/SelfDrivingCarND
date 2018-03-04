@@ -1,0 +1,105 @@
+
+void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
+		const std::vector<LandmarkObs> &observations, const Map &map_landmarks) {
+	// TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
+	//   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
+	// NOTE: The observations are given in the VEHICLE'S coordinate system. Your particles are located
+	//   according to the MAP'S coordinate system. You will need to transform between the two systems.
+	//   Keep in mind that this transformation requires both rotation AND translation (but no scaling).
+	//   The following is a good resource for the theory:
+	//   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
+	//   and the following is a good resource for the actual equation to implement (look at equation 
+	//   3.33
+	//   http://planning.cs.uiuc.edu/node99.html
+
+	// iterate through amount of defined particles
+	for(int i=0; i < num_particles; i++)
+	{
+		// store attributes for easy access
+		double particle_x = particles[i].x;
+		double particle_y = particles[i].y;
+		double particle_theta = particles[i].theta;
+
+		// create a list of landmarks that are visible by the vehicles sensors
+		vector<LandmarkObs> filtered_map_landmarks;
+
+		// iterate through all landmarks in the map
+		for(unsigned int j = 0; j < map_landmarks.landmark_list.size(); j++)
+		{
+			// store attributes for easy access
+			int landmark_id = map_landmarks.landmark_list[j].id_i;
+			float landmark_x = map_landmarks.landmark_list[j].x_f;
+			float landmark_y = map_landmarks.landmark_list[j].y_f;
+
+			// TODO: convert float to double prior to distance calculation
+			//get Eucledian distance from particle to landmark in map
+			double distance = dist(particle_x, particle_y, landmark_x, landmark_y);
+
+			// check if distance is in sensor range
+			if (distance <= sensor_range)
+			{
+				// store potentially visible landmarks into list
+				LandmarkObs selected_landmark;
+				selected_landmark.id	 = landmark_id;
+				selected_landmark.x 	 = landmark_x;
+				selected_landmark.y	 = landmark_y;
+				filtered_map_landmarks.push_back(selected_landmark);
+			}
+		}
+		// create a vector of observations in map coordinates
+		vector<LandmarkObs> observations_in_map_coordinates;
+
+		// transform observations into map coordinates
+		for(unsigned int k = 0; k < observations.size(); k++)
+		{
+			// homogeneous transformation of observations
+			double x_m = particle_x + cos(particle_theta) * observations[k].x - sin(particle_theta) * observations[k].y;
+			double y_m = particle_y + sin(particle_theta) * observations[k].x - cos(particle_theta) * observations[k].y;
+			// transformed observation
+			LandmarkObs transformed_ob;
+			transformed_ob.id = observations[k].id;
+			transformed_ob.x = x_m;
+			transformed_ob.y = y_m;
+			observations_in_map_coordinates.push_back(transformed_ob);
+		}
+		// update observations with nearest IDs of nearest (in range) MAP landmarks
+		dataAssociation(filtered_map_landmarks, observations_in_map_coordinates);
+
+		// re-init weight of current particle (probability that the vehicle is at the position of this particle is 100%)
+		particles[i].weight = 1.0;
+
+		// extract sigma values for x and y
+		double sigma_x = std_landmark[0];
+		double sigma_y = std_landmark[1];
+
+		// search for match in observation and in range landmarks
+		for(unsigned int l; l < observations_in_map_coordinates.size(); l++)
+		{
+			// worst case: no association to given particle
+			double weight = 1;
+			for(unsigned int m; m < filtered_map_landmarks.size(); m++)
+			{
+				if(observations_in_map_coordinates[l].id == filtered_map_landmarks[m].id)
+				{// match found
+					cout << "match found";
+					// extract observation position
+					double obs_x = observations_in_map_coordinates[l].x;
+					double obs_y = observations_in_map_coordinates[l].y;
+
+					// extract in range landmark positions
+					double landmark_x = filtered_map_landmarks[m].x;
+					double landmark_y = filtered_map_landmarks[m].y;
+
+					// calculate multivariate Gaussian probability
+					weight = (1/(2 * M_PI * sigma_x * sigma_y)) *
+							exp(- (	(pow(obs_x - landmark_x, 2)) / (2 * pow(sigma_x, 2))
+								  + (pow(obs_y - landmark_y, 2)) / (2 * pow(sigma_y, 2)) ) );
+				}
+			}
+			// update probability of vehicle being at the particles position
+			particles[i].weight = particles[i].weight * weight;
+
+			weights[i]=particles[i].weight;
+		}
+	}
+}
