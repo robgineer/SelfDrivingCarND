@@ -2,9 +2,9 @@
 
 Writeup for the PID Control project.
 
-##P I D parameter effects
+## P I D parameter effects
 
-###P-Value effects
+### P-Value effects
 The proportional part represents the reaction speed of the correction. Higher values imply quick changes. 
 Lower values imply a less rapid adjustment of the steering angle.
 
@@ -12,14 +12,14 @@ Lower values imply a less rapid adjustment of the steering angle.
 If an error has been observed, how fast should the controller react to the error and start the correction? 
 ```
 
-###I-Value effects
+### I-Value effects
 The integral part represents a long term error memory. Since this value includes all previoulsy recodred errors, higher appearances for the P values will have a long term impact on future corrections.
 
 ```
 What is the systematic error?
 ```
 
-###D-Value effects 
+### D-Value effects 
 The differential part represents the magnitude of the correction to be applied that has been observed between two consecutive errors. Higher values of D lead to sharp and lower values lead to smooth corrections.
 
 ```
