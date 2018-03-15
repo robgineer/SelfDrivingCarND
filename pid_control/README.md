@@ -47,13 +47,12 @@ React smoothly on errors with a high magnitude and neglect a systematic error
 ```
 
 ## Speeding Things Up
-In order to make things a bit more complicated, I have increased the throttle valve value to 0.9. This implied an increase of the error correction magnitude and a minor adjustment to the reaction. The resulting parameters for higher speeds were:
+In order to make things a bit more complicated, I have increased the throttle valve value to 0.9. This implied an increase of the error correction magnitude and a minor adjustment to the reaction. The resulting parameters for higher speeds that were working fine for most of the time are:
 ```
 Kp = -0.08
 Ki = 0
 Kd = -3.0
 ```
-
    
 
 
