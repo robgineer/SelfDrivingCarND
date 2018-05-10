@@ -179,11 +179,6 @@ int main() {
   // The max s value before wrapping around the track back to 0
   double max_s = 6945.554;
 
-  //initial lane no.
-    int lane = 1;
-    // reference velocity
-    double ref_vel = 49.5;
-
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
   string line;
@@ -206,8 +201,13 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
+  //initial lane no.
+  int lane = 1;
+  // reference velocity
+  double ref_vel = 0;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+
+  h.onMessage([&](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -255,13 +255,66 @@ int main() {
 
              int prev_size = previous_path_x.size();
 
+             if(prev_size > 0)
+             {
+            	 	 car_s = end_path_s;
+             }
+
+             bool too_close = false;
+
+             for(unsigned int i = 0; i < sensor_fusion.size(); i++)
+             {
+            	 	 /** sensor_fusion explained:
+            	 	  * [i][0] = id
+            	 	  * [i][1] = x
+            	 	  * [i][2] = y
+            	 	  * [i][3] = velocity in x direction
+            	 	  * [i][4] = velocity in y direction
+            	 	  * [i][5] = s
+            	 	  * [i][6] = d
+            	 	  */
+            	 	 float d = sensor_fusion[i][6];
+            	 	 // each lane is 4m
+            	 	 // center of each lane is at 2m
+            	 	 // the buffer below covers the whole lane
+            	 	 if(d < (2+4*lane+2) && d > (2+4*lane-2))
+            	 	 {
+            	 		 double vx = sensor_fusion[i][3];
+            	 		 double vy = sensor_fusion[i][4];
+            	 		 // get speed using the distance in cartesian coordinates
+            	 		 double check_speed = sqrt(vx*vx+vy*vy);
+            	 		 double check_car_s = sensor_fusion[i][5];
+
+            	 		 // simple extrapolation of car's position (the prediction part)
+            	 		check_car_s = check_car_s + (double)prev_size * 0.02 * check_speed;
+
+            	 		// check if car is in front of EGO and if gap is smaller than 30
+            	 		if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+            	 		{
+            	 			// set flag
+            	 			too_close = true;
+
+            	 		}
+            	 	 }
+             }
+
+ 	 		if(true == too_close)
+ 	 		{
+ 	 			ref_vel = ref_vel - 0.5;
+ 	 		}
+
+ 	 		else if(ref_vel < 49.5)
+ 	 		{
+ 	 			ref_vel = ref_vel + 0.5;
+ 	 		}
+
              if(prev_size < 2){
             	 	 //not enough points on path to be used
-            	 	 // initiate path (starting point is vehicle)
+            	 	 // initiate path (starting point is vehicle's pose)
 
             	 	 // since no previous points are available, create one previous point using the tangent points
-            	 	 int prev_car_x = car_x - cos(car_yaw);
-            	 	 int prev_car_y = car_y - sin(car_yaw);
+            	 	 double prev_car_x = car_x - cos(car_yaw);
+            	 	 double prev_car_y = car_y - sin(car_yaw);
 
             	 	 // store these values into the vector
             	 	 ptsx.push_back(prev_car_x);
@@ -291,19 +344,19 @@ int main() {
 
             //get next 3 points
             vector<double> next_wp0 = getXY(car_s+dist_between_points,
-            										(2+4*1),
+            										(2+4*lane),
             											map_waypoints_s,
 														map_waypoints_x,
 															map_waypoints_y);
 
             vector<double> next_wp1 = getXY(car_s+2*dist_between_points,
-                        										(2+4*1),
+                        										(2+4*lane),
                         											map_waypoints_s,
             														map_waypoints_x,
             															map_waypoints_y);
 
             vector<double> next_wp2 = getXY(car_s+3*dist_between_points,
-                        										(2+4*1),
+                        										(2+4*lane),
                         											map_waypoints_s,
             														map_waypoints_x,
             															map_waypoints_y);
@@ -336,19 +389,6 @@ int main() {
             vector<double> next_x_vals;
 			vector<double> next_y_vals;
 
-//			double dist_inc = 0.3;
-//			 for(int i = 0; i < 50; i++)
-//			 {
-//						double next_s = car_s + (i+1) *dist_inc;
-//						double next_d = 6;
-//						vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-//						next_x_vals.push_back(xy[0]);
-//						next_y_vals.push_back(xy[1]);
-//				   //next_x_vals.push_back(car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
-//				   //next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
-//			 }
-
-
 			// if a previous path exist, use its points and add them to the next path
 			// the previous_path_x/_y represents the points on the previous path that have not been reached
 			// --> enables smooth transitions between paths
@@ -369,11 +409,10 @@ int main() {
 			double x_add_on = 0.0;
 
 			// N = amount of points along the line from car origin until target_dist
-			double N = (target_dist/(0.02 * (49.5 / 2.24)));
+			double N = (target_dist/(0.02 * (ref_vel / 2.24)));
 
 			for(int i = 0; i < 50 - previous_path_x.size(); i++)
 			{
-
 				// next x point
 				double x_point = x_add_on + (target_x) / N;
 				// next y point
@@ -394,10 +433,8 @@ int main() {
 
 				next_x_vals.push_back(x_point);
 				next_y_vals.push_back(y_point);
-
 			}
 
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
 
