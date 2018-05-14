@@ -164,6 +164,57 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+float inefficiency_cost(float target_speed, int intended_lane, int final_lane, vector<float> lane_speeds)
+{
+    /*
+    Cost becomes higher for trajectories with intended lane and final lane that have traffic slower than target_speed.
+    */
+	float speed_intended = lane_speeds[intended_lane];
+	float speed_final = lane_speeds[final_lane];
+	//float cost = (2.0*target_speed - speed_intended - speed_final)/target_speed;
+	float delta = (2.0*target_speed - speed_intended - speed_final);
+	float cost = 1-exp(-(abs(delta) /target_speed));
+    return cost;
+}
+
+int calc_efficient_lane_index(float target_speed, vector<float> lane_speeds, vector<int> lane_collisions)
+{
+    /*
+    Cost becomes higher for trajectories with intended lane and final lane that have traffic slower than target_speed.
+    */
+	vector<float> lane_costs;
+
+	for(unsigned int i = 0; i< lane_speeds.size(); i++ ){
+		float speed_intended = lane_speeds[i];
+		float delta = (2.0*target_speed - speed_intended);
+		float cost = (1-exp(-(abs(delta) /target_speed))) + lane_collisions[i];
+		lane_costs.push_back(cost);
+	}
+	std::cout << std::distance(lane_costs.begin(), std::max_element(lane_costs.begin(), lane_costs.end()))  << endl;
+	return std::distance(lane_costs.begin(), std::min_element(lane_costs.begin(), lane_costs.end()));
+}
+
+vector<float> calc_lane_costs(float target_speed, vector<float> lane_speeds)
+{
+    /*
+    Cost becomes higher for trajectories with intended lane and final lane that have traffic slower than target_speed.
+    */
+	vector<float> lane_costs;
+
+	for(unsigned int i = 0; i< lane_speeds.size(); i++)
+	{
+		float speed_intended = lane_speeds[i];
+		float delta = (3.0*target_speed - speed_intended);
+		float cost = (1-exp(-(abs(delta) /target_speed))) ;
+		lane_costs.push_back(cost);
+	}
+	return lane_costs;
+}
+
+
+
+
+
 int main() {
   uWS::Hub h;
 
@@ -204,7 +255,15 @@ int main() {
   //initial lane no.
   int lane = 1;
   // reference velocity
-  double ref_vel = 0;
+  float ref_vel = 0;
+  float const target_velocity = 49.5;
+ // state
+  string state = "INIT";
+  // target speed
+  float target_vehicle_velocity = 0;
+
+  float left_lane_velocity = 0;
+  float right_lane_velocity = 0;
 
 
   h.onMessage([&](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -261,7 +320,19 @@ int main() {
              }
 
              bool too_close = false;
+             bool potential_collision_left = false;
+             bool potential_collision_right = false;
+             vector<float> lane_speeds = {49.5, 49.5, 49.5};
+             vector<int> lane_collisions = {0, 0, 0};
+             vector<int> lane_costs = {0, 0, 0};
 
+             lane_speeds[lane] = car_speed;
+
+             int left_d = 0;
+                     	 		int left_s = 0;
+                     	 		int center_d = 0;
+                     	 		int right_d = 0;
+                     	 		int right_s = 0;
              for(unsigned int i = 0; i < sensor_fusion.size(); i++)
              {
             	 	 /** sensor_fusion explained:
@@ -274,41 +345,205 @@ int main() {
             	 	  * [i][6] = d
             	 	  */
             	 	 float d = sensor_fusion[i][6];
+        	 		 double vx = sensor_fusion[i][3];
+        	 		 double vy = sensor_fusion[i][4];
+        	 		 // get speed using the distance in cartesian coordinates
+        	 		 double check_speed_meter = sqrt(vx*vx+vy*vy);
+        	 		 float check_speed = sqrt(vx*vx+vy*vy) * 2.24;
+        	 		 double check_car_s = sensor_fusion[i][5];
+
+        	 		 // simple extrapolation of car's position (the prediction part)
+        	 		 check_car_s = check_car_s + (double)prev_size * 0.02 * check_speed_meter;
+
             	 	 // each lane is 4m
             	 	 // center of each lane is at 2m
             	 	 // the buffer below covers the whole lane
+
+            	 	int left_lane = lane - 1;
+
+            	 	int right_lane = lane + 1;
+
+            	 	// SOMETHING WRONG HERE::::: left and right objects are not identified
+
+            	 	// left lane
+				if(d < (4*left_lane+4) && d > (4*left_lane))
+				{
+					// this car is in my left lane
+					if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+					{
+						// this car is in front of me (potential target object)
+						left_lane_velocity = check_speed;
+						lane_speeds[left_lane] = check_speed;
+					}
+					else if((check_car_s <= car_s) && ((car_s - check_car_s) < 30))
+					{
+						// this car is behind or next to me
+						potential_collision_left = true;
+						lane_collisions[left_lane] = 1;
+						left_d = d;
+						left_s = check_car_s;
+					}
+				}
+
+
+
+            	 	// right lane
+				if(d < (2+4*right_lane+2) && d > (2+4*right_lane-2)){
+					// this car is in my right lane
+					if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+					{
+						// this car is in front of me
+						right_lane_velocity = check_speed;
+						lane_speeds[2] = check_speed;
+					}
+					if((check_car_s <= car_s) && ((car_s - check_car_s) < 30))
+					{
+					// this car is behind or next to me
+					potential_collision_right = true;
+					lane_collisions[right_lane] = 1;
+					right_d = d;
+					right_s = check_car_s;
+					}
+				}
+
+
+            	 	 // my lane
             	 	 if(d < (2+4*lane+2) && d > (2+4*lane-2))
             	 	 {
-            	 		 double vx = sensor_fusion[i][3];
-            	 		 double vy = sensor_fusion[i][4];
-            	 		 // get speed using the distance in cartesian coordinates
-            	 		 double check_speed = sqrt(vx*vx+vy*vy);
-            	 		 double check_car_s = sensor_fusion[i][5];
-
-            	 		 // simple extrapolation of car's position (the prediction part)
-            	 		check_car_s = check_car_s + (double)prev_size * 0.02 * check_speed;
-
             	 		// check if car is in front of EGO and if gap is smaller than 30
             	 		if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
             	 		{
             	 			// set flag
             	 			too_close = true;
-
+            	 			//lane = 0;
+            	 			//ref_vel = check_speed;
+            	 			target_vehicle_velocity = check_speed;
+            	 			lane_speeds[lane] = check_speed;
             	 		}
             	 	 }
              }
 
- 	 		if(true == too_close)
- 	 		{
- 	 			ref_vel = ref_vel - 0.5;
- 	 		}
+			float left_cost = inefficiency_cost(49.5, 0, 1, lane_speeds);
+			float right_cost = inefficiency_cost(49.5, 2, 1, lane_speeds);
+			float center_cost = inefficiency_cost(49.5, 1, 1, lane_speeds);
 
- 	 		else if(ref_vel < 49.5)
- 	 		{
- 	 			ref_vel = ref_vel + 0.5;
- 	 		}
+			int best_lane = calc_efficient_lane_index(49.5, lane_speeds, lane_collisions);
 
-             if(prev_size < 2){
+			cout << "left_cost: " << left_cost << endl;
+			cout << "collision_left: " << potential_collision_left << endl;
+			cout << "left_d: " << right_d << endl;
+			cout << "left_s: " << right_s << endl;
+			cout << "right_cost: " << right_cost << endl;
+			cout << "collision_right: " << potential_collision_right << endl;
+			cout << "right_d: " << right_d << endl;
+			cout << "right_s: " << right_s << endl;
+			cout << "center_cost: " << center_cost << endl;
+			cout << "################" << endl;
+			cout << "best lane: " << best_lane << endl;
+			cout << "################" << endl;
+			cout << "my_speed: " << car_speed << endl;
+			cout << "left_speed: " << lane_speeds[0] << endl;
+			cout << "center_speed: " << lane_speeds[1] << endl;
+			cout << "right_speed: " << lane_speeds[2] << endl;
+
+             if("INIT" == state){
+            	 	 if(ref_vel < 49.5)
+				 {
+					 // startup
+					 ref_vel = ref_vel + 0.5;
+				  }
+            	 	 else{
+            	 		 state = "FOLLOW_LANE";
+            	 	 }
+             }
+             else if("FOLLOW_LANE" == state){
+             	 if(too_close == true)
+             	 {
+             		state = "TRACK_GAP";
+             	 }
+             	 else {
+             		 if(ref_vel < 49.5)
+             		 {
+             			 // keep velocity
+             		     ref_vel = ref_vel + 0.5;
+             		  }
+             	 }
+             }
+
+             else if("TRACK_GAP" == state){
+            		if(ref_vel>target_vehicle_velocity)
+            		{
+            			// decrease velocity
+            			ref_vel = ref_vel - 0.3;
+            		}
+
+
+			/*	if (right_cost < left_cost && right_cost < center_cost  && potential_collision_right == false){
+					state = "CHANGE_LANE_RIGHT";
+				}
+				if (left_cost <= right_cost && left_cost < center_cost  && potential_collision_left == false)
+				{
+					state = "CHANGE_LANE_LEFT";
+				}
+				else
+				{
+					state = "TRACK_GAP";
+				}
+				*/
+
+            		vector<float> lane_costs = calc_lane_costs(49.5, lane_speeds);
+
+            		switch(lane){
+            			case 0:
+            				if(lane_costs[lane]>lane_costs[lane+1] && lane_collisions[lane+1] == 0){
+            					lane = lane +1;
+            					state = "FOLLOW_LANE";
+            					too_close = false;
+            				}
+
+            				break;
+            			case 1:
+            				if(lane_costs[lane]>lane_costs[lane-1] && lane_collisions[lane-1] == 0){
+            					lane = lane -1 ;
+            					state = "FOLLOW_LANE";
+            					too_close = false;
+            				}
+            				else if(lane_costs[lane]>lane_costs[lane+1]  && lane_collisions[lane+1] == 0){
+            					lane = lane + 1 ;
+            					state = "FOLLOW_LANE";
+            					too_close = false;
+            				}
+            				break;
+            			case 2:
+            				if(lane_costs[lane]>lane_costs[lane-1] && lane_collisions[lane-1] == 0){
+            					lane = lane -1 ;
+            					state = "FOLLOW_LANE";
+            					too_close = false;
+            				}
+            			break;
+            		}
+
+            		/*if(lane != best_lane){
+            			lane = best_lane;
+
+            		}
+            		*/
+             }
+
+             else if("CHANGE_LANE_RIGHT" == state){
+            	 	 lane = lane +1;
+            	 	 state = "FOLLOW_LANE";
+             }
+             else if("CHANGE_LANE_LEFT" == state){
+            	 	 lane = lane-1;
+                 state = "FOLLOW_LANE";
+              }
+
+             cout << "STATE: " << state << endl;
+
+
+             if(prev_size < 2)
+             {
             	 	 //not enough points on path to be used
             	 	 // initiate path (starting point is vehicle's pose)
 
