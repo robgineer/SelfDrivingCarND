@@ -365,17 +365,20 @@ int main() {
 
             	 	// SOMETHING WRONG HERE::::: left and right objects are not identified
 
-            	 	// left lane
+            	 	// left lane (never true if EGO is in the left most lane)
 				if(d < (4*left_lane+4) && d > (4*left_lane))
 				{
+					// TARGET ZONE
 					// this car is in my left lane
-					if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+					//target buffer front +20
+					if((check_car_s > (car_s + 10)) && (check_car_s < (car_s + 30)))
 					{
 						// this car is in front of me (potential target object)
 						left_lane_velocity = check_speed;
 						lane_speeds[left_lane] = check_speed;
 					}
-					else if((check_car_s <= car_s) && ((car_s - check_car_s) < 30))
+					// COLLISION ZONE
+					else if((check_car_s > car_s - 10) && ((check_car_s < car_s + 15)))
 					{
 						// this car is behind or next to me
 						potential_collision_left = true;
@@ -385,18 +388,19 @@ int main() {
 					}
 				}
 
-
-
-            	 	// right lane
+            	 	// right lane (never true if EGO is on the right most lane)
 				if(d < (2+4*right_lane+2) && d > (2+4*right_lane-2)){
+
+					// TARGET ZONE
 					// this car is in my right lane
-					if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+					if((check_car_s > (car_s + 10)) && (check_car_s < (car_s + 30)))
 					{
 						// this car is in front of me
 						right_lane_velocity = check_speed;
 						lane_speeds[2] = check_speed;
 					}
-					if((check_car_s <= car_s) && ((car_s - check_car_s) < 30))
+					// COLLISION ZONE
+					else if((check_car_s > car_s - 10) && ((check_car_s < car_s + 15)))
 					{
 					// this car is behind or next to me
 					potential_collision_right = true;
@@ -411,7 +415,7 @@ int main() {
             	 	 if(d < (2+4*lane+2) && d > (2+4*lane-2))
             	 	 {
             	 		// check if car is in front of EGO and if gap is smaller than 30
-            	 		if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+            	 		if((check_car_s > (car_s + 10)) && (check_car_s < (car_s + 30)))
             	 		{
             	 			// set flag
             	 			too_close = true;
@@ -575,7 +579,7 @@ int main() {
             	 	 ptsy.push_back(ref_y);
 
              }
-            int dist_between_points = 30;
+            int dist_between_points = 50;
 
             //get next 3 points
             vector<double> next_wp0 = getXY(car_s+dist_between_points,
@@ -636,7 +640,7 @@ int main() {
 			// derive a constant velocity using evenly distanced spline points
 			// constant execution cycle time && ref velocity -> decrease in velocity with increase of distance between points
 			//  == the distance of points represents the velocity
-			double target_x = 30.0;
+			double target_x = 50.0;
 			double target_y = s(target_x);
 			double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
 
