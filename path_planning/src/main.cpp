@@ -164,64 +164,30 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
-float inefficiency_cost(float target_speed, int intended_lane, int final_lane, vector<float> lane_speeds)
+/**
+ * Returns a vector of costs of each lane based on lane velocities
+ * and the distance to potential target objects
+ */
+vector<float> calc_lane_costs(float target_speed, vector<float> lane_speeds, vector<float> targets)
 {
-    /*
-    Cost becomes higher for trajectories with intended lane and final lane that have traffic slower than target_speed.
-    */
-	float speed_intended = lane_speeds[intended_lane];
-	float speed_final = lane_speeds[final_lane];
-	//float cost = (2.0*target_speed - speed_intended - speed_final)/target_speed;
-	float delta = (2.0*target_speed - speed_intended - speed_final);
-	float cost = 1-exp(-(abs(delta) /target_speed));
-    return cost;
-}
 
-int calc_efficient_lane_index(float target_speed, vector<float> lane_speeds, vector<int> lane_collisions)
-{
-    /*
-    Cost becomes higher for trajectories with intended lane and final lane that have traffic slower than target_speed.
-    */
+	/*
+	 * Cost becomes higher for trajectories with that have traffic slower than target_speed.
+	 */
 	vector<float> lane_costs;
 
-	for(unsigned int i = 0; i< lane_speeds.size(); i++ ){
-		float speed_intended = lane_speeds[i];
-		float delta = (2.0*target_speed - speed_intended);
-		float cost = (1-exp(-(abs(delta) /target_speed))) + lane_collisions[i];
-		lane_costs.push_back(cost);
+	float target_delta_sum = 0.0001;
+	for(unsigned int i = 0; i< lane_speeds.size(); i++)
+	{
+		target_delta_sum = target_delta_sum + targets[i];
 	}
-	std::cout << std::distance(lane_costs.begin(), std::max_element(lane_costs.begin(), lane_costs.end()))  << endl;
-	return std::distance(lane_costs.begin(), std::min_element(lane_costs.begin(), lane_costs.end()));
-}
-
-vector<float> calc_lane_costs(float target_speed, vector<float> lane_speeds)
-{
-    /*
-    Cost becomes higher for trajectories with that have traffic slower than target_speed.
-    */
-	vector<float> lane_costs;
 
 	for(unsigned int i = 0; i< lane_speeds.size(); i++)
 	{
 		float speed_intended = lane_speeds[i];
-		float delta = (target_speed - speed_intended);
-		float cost = (1-exp(-(abs(delta) /target_speed))) ;
-		lane_costs.push_back(cost);
-	}
-	return lane_costs;
-}
-
-
-vector<float> calc_lane_costs2(float target_speed, vector<float> lane_speeds, vector<int> targets)
-{
-
-	vector<float> lane_costs;
-
-	for(unsigned int i = 0; i< lane_speeds.size(); i++)
-	{
-		float speed_intended = lane_speeds[i];
-		float delta = (target_speed - speed_intended - targets[i]*10);
-		float cost = (1-exp(-(abs(delta) /target_speed))) ;
+		float velocity_delta = abs(target_speed - speed_intended);
+		float target_distance_delta = targets[i] / target_delta_sum;
+		float cost = (1-exp(-(2*((velocity_delta) /target_speed) + target_distance_delta ))) ;
 		lane_costs.push_back(cost);
 	}
 	return lane_costs;
@@ -246,6 +212,9 @@ vector<int> get_feasible_lane_change(int current_lane){
 	return feasible_lanes;
 }
 
+/**
+ * Return the next collision free lane that is cost minimal.
+ */
 int get_next_lane(vector<float> lane_costs, vector<int> feasible_lanes, vector<int> lane_collisions, int current_lane){
 
 	int next_lane = current_lane;
@@ -384,8 +353,8 @@ int main() {
              bool target_vehicle_present = false;
              bool potential_collision_left = false;
              bool potential_collision_right = false;
-             vector<float> lane_velocities = {49.5, 49.5, 49.5};
-             vector<int> potential_targets = {0,0,0};
+             vector<float> lane_velocities = {target_velocity, target_velocity, target_velocity};
+             vector<float> potential_target_distance = {0,0,0};
              vector<int> lane_collisions = {0, 0, 0};
              vector<int> lane_costs_unclear = {0, 0, 0};
 
@@ -441,7 +410,7 @@ int main() {
 						// this car is in front of me (potential target object)
 						left_lane_velocity = dynamic_object_vel;
 						lane_velocities[left_lane] = dynamic_object_vel;
-						potential_targets[left_lane] = 1;
+						potential_target_distance[left_lane] = dynamic_object_s - car_s ;
 					}
 					// COLLISION ZONE
 					if((dynamic_object_s > (car_s - 10)) && (dynamic_object_s < (car_s + 15)))
@@ -464,7 +433,7 @@ int main() {
 						// this car is in front of me
 						right_lane_velocity = dynamic_object_vel;
 						lane_velocities[right_lane] = dynamic_object_vel;
-						potential_targets[right_lane] = 1;
+						potential_target_distance[right_lane] = dynamic_object_s - car_s ;
 					}
 					// COLLISION ZONE
 					if((dynamic_object_s > (car_s - 10)) && (dynamic_object_s < (car_s + 15)))
@@ -488,13 +457,13 @@ int main() {
             	 			target_vehicle_present = true;
             	 			target_vehicle_velocity = dynamic_object_vel;
             	 			lane_velocities[lane] = dynamic_object_vel;
-            	 			potential_targets[lane] = 1;
+            	 			potential_target_distance[lane] = dynamic_object_s - car_s ;
             	 		}
             	 	 }
              }
 
 
-  			vector<float> lane_costs = calc_lane_costs2(49.5, lane_velocities, potential_targets);
+  			vector<float> lane_costs = calc_lane_costs(target_velocity, lane_velocities, potential_target_distance);
 			vector<int> possible_lanes = get_feasible_lane_change(lane);
 			int next_lane = get_next_lane(lane_costs, possible_lanes, lane_collisions, lane);
 
@@ -502,19 +471,19 @@ int main() {
 			cout << "####### PLANNING INFO #########" << endl;
 			cout << "----- Left lane ----" << endl;
 			cout << "Cost left lane: " << lane_costs[0] << endl;
-			cout << "Potential collision on left lane: " << potential_collision_left << endl;
 			cout << "Velocity of left lane: " << lane_velocities[0] << endl;
 			cout << "----- Center lane ----" << endl;
 			cout << "Cost center lane: " << lane_costs[1] << endl;
 			cout << "Velocity of center lane: " << lane_velocities[1] << endl;
 			cout << "----- Right lane ----" << endl;
 			cout << "Cost right lane: " << lane_costs[2] << endl;
-			cout << "Potential collision on right lane: " << potential_collision_right << endl;
 			cout << "Velocity of right lane: " << lane_velocities[2] << endl;
             cout << "####### EGO INFO #########" << endl;
             cout << "EGO velocity: " << car_speed << endl;
             cout << "Next state change timer : " << state_timer << endl;
             cout << "Current lane: " << lane << endl;
+            cout << "Potential collision on left lane: " << potential_collision_left << endl;
+            cout << "Potential collision on right lane: " << potential_collision_right << endl;
             cout << "State: " << state << endl;
 
 
@@ -525,7 +494,7 @@ int main() {
              	 }
              	 else
              	 {
-             		 if(ref_vel < 49.5)
+             		 if(ref_vel < target_velocity)
              		 {
              			 // keep velocity
              		     ref_vel = ref_vel + 0.5;
@@ -544,10 +513,10 @@ int main() {
             			// decrease velocity
             			ref_vel = ref_vel - 0.3;
             		}
-            		else if(ref_vel<target_vehicle_velocity + 5)
+            		else if(ref_vel<target_vehicle_velocity + 10)
             		{
             			// increase velocity in case target vehicle accelerates
-            		    ref_vel = ref_vel + 0.3;
+            		    ref_vel = ref_vel + 0.2;
             		}
 
             		if(state_timer > 0){
@@ -569,7 +538,6 @@ int main() {
              {
             	 	 // not enough points on path to be used
             	 	 // initiate path (starting point is vehicle's pose)
-
             	 	 // since no previous points are available, create one previous point using the tangent points
             	 	 double prev_car_x = car_x - cos(car_yaw);
             	 	 double prev_car_y = car_y - sin(car_yaw);
@@ -580,7 +548,7 @@ int main() {
 
             	 	 ptsy.push_back(prev_car_y);
             	 	 ptsy.push_back(car_y);
-            	 	 // --> now you got two x, and y points in the vector
+            	 	 // --> now there are two x, and y points in the vector
              }
              else
              {
@@ -598,7 +566,7 @@ int main() {
             	 	 ptsy.push_back(ref_y);
 
              }
-            int dist_between_points = 50;
+            int dist_between_points = 30;
 
             //get next 3 points
             vector<double> next_wp0 = getXY(car_s+dist_between_points,
@@ -639,10 +607,10 @@ int main() {
             }
 
             // define spline
-            tk::spline s;
+            tk::spline ego_spline;
 
             // assign points to spline
-            s.set_points(ptsx,ptsy);
+            ego_spline.set_points(ptsx,ptsy);
 
             vector<double> next_x_vals;
 			vector<double> next_y_vals;
@@ -660,7 +628,7 @@ int main() {
 			// constant execution cycle time && ref velocity -> decrease in velocity with increase of distance between points
 			//  == the distance of points represents the velocity
 			double target_x = 30.0;
-			double target_y = s(target_x);
+			double target_y = ego_spline(target_x);
 			double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
 
 			// start at car origin
@@ -674,7 +642,7 @@ int main() {
 				// next x point
 				double x_point = x_add_on + (target_x) / N;
 				// next y point
-				double y_point = s(x_point);
+				double y_point = ego_spline(x_point);
 
 				// move to next point
 				x_add_on = x_point;
