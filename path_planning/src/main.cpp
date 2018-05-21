@@ -197,14 +197,14 @@ int calc_efficient_lane_index(float target_speed, vector<float> lane_speeds, vec
 vector<float> calc_lane_costs(float target_speed, vector<float> lane_speeds)
 {
     /*
-    Cost becomes higher for trajectories with intended lane and final lane that have traffic slower than target_speed.
+    Cost becomes higher for trajectories with that have traffic slower than target_speed.
     */
 	vector<float> lane_costs;
 
 	for(unsigned int i = 0; i< lane_speeds.size(); i++)
 	{
 		float speed_intended = lane_speeds[i];
-		float delta = (3.0*target_speed - speed_intended);
+		float delta = (target_speed - speed_intended);
 		float cost = (1-exp(-(abs(delta) /target_speed))) ;
 		lane_costs.push_back(cost);
 	}
@@ -212,7 +212,66 @@ vector<float> calc_lane_costs(float target_speed, vector<float> lane_speeds)
 }
 
 
+vector<float> calc_lane_costs2(float target_speed, vector<float> lane_speeds, vector<int> targets)
+{
 
+	vector<float> lane_costs;
+
+	for(unsigned int i = 0; i< lane_speeds.size(); i++)
+	{
+		float speed_intended = lane_speeds[i];
+		float delta = (target_speed - speed_intended - targets[i]*10);
+		float cost = (1-exp(-(abs(delta) /target_speed))) ;
+		lane_costs.push_back(cost);
+	}
+	return lane_costs;
+}
+
+/**
+ * Returns all feasible lane change maneuvers
+ * Current_lane == center lane -->  left + right
+ * Current_lane == left most lane -->  right
+ * Current_lane == right most lane -->  left
+ */
+vector<int> get_feasible_lane_change(int current_lane){
+
+	vector<int> feasible_lanes = {0,0};
+
+	// left lane
+	feasible_lanes[0] = (current_lane -1) >= 0;
+
+	// right lane
+	feasible_lanes[1] = (current_lane +1) <= 2;
+
+	return feasible_lanes;
+}
+
+int get_next_lane(vector<float> lane_costs, vector<int> feasible_lanes, vector<int> lane_collisions, int current_lane){
+
+	int next_lane = current_lane;
+	// check if left lane change maneuver is feasible
+	if(feasible_lanes[0] > 0)
+	{
+		if(lane_costs[current_lane]>lane_costs[current_lane-1] && lane_collisions[current_lane-1] == 0)
+		{
+			next_lane = current_lane-1;
+		}
+	}
+	// check if right lane change maneuver is feasible
+	// prefer left lane change if EGO is in center lane as long as costs are equal
+	if(feasible_lanes[1] > 0)
+	{
+		if(lane_costs[current_lane]>lane_costs[current_lane+1]
+					   && lane_collisions[current_lane+1] == 0
+							   	   && lane_costs[current_lane-1] > lane_costs[current_lane+1] )
+		{
+			next_lane = current_lane+1;
+		}
+	}
+
+	return next_lane;
+
+}
 
 
 int main() {
@@ -256,15 +315,18 @@ int main() {
   int lane = 1;
   // reference velocity
   float ref_vel = 0;
+  // target velocity
   float const target_velocity = 49.5;
  // state
-  string state = "INIT";
-  // target speed
+  string state = "FOLLOW_LANE";
+  // target vehicle velocity
   float target_vehicle_velocity = 0;
-
+  // left lane velocity
   float left_lane_velocity = 0;
+  // right lane velocity
   float right_lane_velocity = 0;
 
+  int state_timer = 100;
 
   h.onMessage([&](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -319,16 +381,17 @@ int main() {
             	 	 car_s = end_path_s;
              }
 
-             bool too_close = false;
+             bool target_vehicle_present = false;
              bool potential_collision_left = false;
              bool potential_collision_right = false;
-             vector<float> lane_speeds = {49.5, 49.5, 49.5};
+             vector<float> lane_velocities = {49.5, 49.5, 49.5};
+             vector<int> potential_targets = {0,0,0};
              vector<int> lane_collisions = {0, 0, 0};
-             vector<int> lane_costs = {0, 0, 0};
+             vector<int> lane_costs_unclear = {0, 0, 0};
 
-             lane_speeds[lane] = car_speed;
+             lane_velocities[lane] = car_speed;
 
-             int left_d = 0;
+             int collision_zone_left_d = 0;
                      	 		int left_s = 0;
                      	 		int center_d = 0;
                      	 		int right_d = 0;
@@ -344,16 +407,20 @@ int main() {
             	 	  * [i][5] = s
             	 	  * [i][6] = d
             	 	  */
-            	 	 float d = sensor_fusion[i][6];
-        	 		 double vx = sensor_fusion[i][3];
-        	 		 double vy = sensor_fusion[i][4];
+
+            	 	 // characteristics of dynamic objects
+            	 	 float dynamic_object_d = sensor_fusion[i][6];
+        	 		 double dynamic_object_vx = sensor_fusion[i][3];
+        	 		 double dynamic_object_vy = sensor_fusion[i][4];
+
         	 		 // get speed using the distance in cartesian coordinates
-        	 		 double check_speed_meter = sqrt(vx*vx+vy*vy);
-        	 		 float check_speed = sqrt(vx*vx+vy*vy) * 2.24;
-        	 		 double check_car_s = sensor_fusion[i][5];
+        	 		 double dynamic_object_vel_meter = sqrt(dynamic_object_vx*dynamic_object_vx+dynamic_object_vy*dynamic_object_vy);
+        	 		 float dynamic_object_vel = sqrt(dynamic_object_vx*dynamic_object_vx+dynamic_object_vy*dynamic_object_vy) * 2.24;
+        	 		 double dynamic_object_s = sensor_fusion[i][5];
 
         	 		 // simple extrapolation of car's position (the prediction part)
-        	 		 check_car_s = check_car_s + (double)prev_size * 0.02 * check_speed_meter;
+        	 		 dynamic_object_s = dynamic_object_s + (double)prev_size * 0.02 * dynamic_object_vel_meter;
+
 
             	 	 // each lane is 4m
             	 	 // center of each lane is at 2m
@@ -363,192 +430,144 @@ int main() {
 
             	 	int right_lane = lane + 1;
 
-            	 	// SOMETHING WRONG HERE::::: left and right objects are not identified
-
             	 	// left lane (never true if EGO is in the left most lane)
-				if(d < (4*left_lane+4) && d > (4*left_lane))
+				if(dynamic_object_d < (4*left_lane+4) && dynamic_object_d > (4*left_lane))
 				{
 					// TARGET ZONE
 					// this car is in my left lane
 					//target buffer front +20
-					if((check_car_s > (car_s + 10)) && (check_car_s < (car_s + 30)))
+					if((dynamic_object_s > (car_s + 10)) && (dynamic_object_s < (car_s + 30)))
 					{
 						// this car is in front of me (potential target object)
-						left_lane_velocity = check_speed;
-						lane_speeds[left_lane] = check_speed;
+						left_lane_velocity = dynamic_object_vel;
+						lane_velocities[left_lane] = dynamic_object_vel;
+						potential_targets[left_lane] = 1;
 					}
 					// COLLISION ZONE
-					else if((check_car_s > car_s - 10) && ((check_car_s < car_s + 15)))
+					if((dynamic_object_s > (car_s - 10)) && (dynamic_object_s < (car_s + 15)))
 					{
 						// this car is behind or next to me
 						potential_collision_left = true;
 						lane_collisions[left_lane] = 1;
-						left_d = d;
-						left_s = check_car_s;
+						collision_zone_left_d = dynamic_object_d;
+						left_s = dynamic_object_s;
 					}
 				}
 
             	 	// right lane (never true if EGO is on the right most lane)
-				if(d < (2+4*right_lane+2) && d > (2+4*right_lane-2)){
+				if(dynamic_object_d < (2+4*right_lane+2) && dynamic_object_d > (2+4*right_lane-2)){
 
 					// TARGET ZONE
 					// this car is in my right lane
-					if((check_car_s > (car_s + 10)) && (check_car_s < (car_s + 30)))
+					if((dynamic_object_s > (car_s + 10)) && (dynamic_object_s < (car_s + 30)))
 					{
 						// this car is in front of me
-						right_lane_velocity = check_speed;
-						lane_speeds[2] = check_speed;
+						right_lane_velocity = dynamic_object_vel;
+						lane_velocities[right_lane] = dynamic_object_vel;
+						potential_targets[right_lane] = 1;
 					}
 					// COLLISION ZONE
-					else if((check_car_s > car_s - 10) && ((check_car_s < car_s + 15)))
+					if((dynamic_object_s > (car_s - 10)) && (dynamic_object_s < (car_s + 15)))
 					{
 					// this car is behind or next to me
 					potential_collision_right = true;
 					lane_collisions[right_lane] = 1;
-					right_d = d;
-					right_s = check_car_s;
+					right_d = dynamic_object_d;
+					right_s = dynamic_object_s;
 					}
 				}
 
-
-            	 	 // my lane
-            	 	 if(d < (2+4*lane+2) && d > (2+4*lane-2))
+            	 	 // EGO lane
+            	 	 if(dynamic_object_d < (2+4*lane+2) && dynamic_object_d > (2+4*lane-2))
             	 	 {
             	 		// check if car is in front of EGO and if gap is smaller than 30
-            	 		if((check_car_s > (car_s + 10)) && (check_car_s < (car_s + 30)))
+            	 		if((dynamic_object_s > (car_s + 10)) && (dynamic_object_s < (car_s + 30)))
             	 		{
+            	 			// vehicle in target zone identified
             	 			// set flag
-            	 			too_close = true;
-            	 			//lane = 0;
-            	 			//ref_vel = check_speed;
-            	 			target_vehicle_velocity = check_speed;
-            	 			lane_speeds[lane] = check_speed;
+            	 			target_vehicle_present = true;
+            	 			target_vehicle_velocity = dynamic_object_vel;
+            	 			lane_velocities[lane] = dynamic_object_vel;
+            	 			potential_targets[lane] = 1;
             	 		}
             	 	 }
              }
 
-			float left_cost = inefficiency_cost(49.5, 0, 1, lane_speeds);
-			float right_cost = inefficiency_cost(49.5, 2, 1, lane_speeds);
-			float center_cost = inefficiency_cost(49.5, 1, 1, lane_speeds);
 
-			int best_lane = calc_efficient_lane_index(49.5, lane_speeds, lane_collisions);
+  			vector<float> lane_costs = calc_lane_costs2(49.5, lane_velocities, potential_targets);
+			vector<int> possible_lanes = get_feasible_lane_change(lane);
+			int next_lane = get_next_lane(lane_costs, possible_lanes, lane_collisions, lane);
 
-			cout << "left_cost: " << left_cost << endl;
-			cout << "collision_left: " << potential_collision_left << endl;
-			cout << "left_d: " << right_d << endl;
-			cout << "left_s: " << right_s << endl;
-			cout << "right_cost: " << right_cost << endl;
-			cout << "collision_right: " << potential_collision_right << endl;
-			cout << "right_d: " << right_d << endl;
-			cout << "right_s: " << right_s << endl;
-			cout << "center_cost: " << center_cost << endl;
-			cout << "################" << endl;
-			cout << "best lane: " << best_lane << endl;
-			cout << "################" << endl;
-			cout << "my_speed: " << car_speed << endl;
-			cout << "left_speed: " << lane_speeds[0] << endl;
-			cout << "center_speed: " << lane_speeds[1] << endl;
-			cout << "right_speed: " << lane_speeds[2] << endl;
 
-             if("INIT" == state){
-            	 	 if(ref_vel < 49.5)
-				 {
-					 // startup
-					 ref_vel = ref_vel + 0.5;
-				  }
-            	 	 else{
-            	 		 state = "FOLLOW_LANE";
-            	 	 }
-             }
-             else if("FOLLOW_LANE" == state){
-             	 if(too_close == true)
+			cout << "####### PLANNING INFO #########" << endl;
+			cout << "----- Left lane ----" << endl;
+			cout << "Cost left lane: " << lane_costs[0] << endl;
+			cout << "Potential collision on left lane: " << potential_collision_left << endl;
+			cout << "Velocity of left lane: " << lane_velocities[0] << endl;
+			cout << "----- Center lane ----" << endl;
+			cout << "Cost center lane: " << lane_costs[1] << endl;
+			cout << "Velocity of center lane: " << lane_velocities[1] << endl;
+			cout << "----- Right lane ----" << endl;
+			cout << "Cost right lane: " << lane_costs[2] << endl;
+			cout << "Potential collision on right lane: " << potential_collision_right << endl;
+			cout << "Velocity of right lane: " << lane_velocities[2] << endl;
+            cout << "####### EGO INFO #########" << endl;
+            cout << "EGO velocity: " << car_speed << endl;
+            cout << "Next state change timer : " << state_timer << endl;
+            cout << "Current lane: " << lane << endl;
+            cout << "State: " << state << endl;
+
+
+             if("FOLLOW_LANE" == state){
+             	 if(true == target_vehicle_present)
              	 {
              		state = "TRACK_GAP";
              	 }
-             	 else {
+             	 else
+             	 {
              		 if(ref_vel < 49.5)
              		 {
              			 // keep velocity
              		     ref_vel = ref_vel + 0.5;
              		  }
              	 }
+             	if(state_timer > 0){
+             	    // decrement state timer
+             		state_timer= state_timer - 1;
+             	}
              }
 
-             else if("TRACK_GAP" == state){
+             else if("TRACK_GAP" == state)
+             {
             		if(ref_vel>target_vehicle_velocity)
             		{
             			// decrease velocity
             			ref_vel = ref_vel - 0.3;
             		}
-
-
-			/*	if (right_cost < left_cost && right_cost < center_cost  && potential_collision_right == false){
-					state = "CHANGE_LANE_RIGHT";
-				}
-				if (left_cost <= right_cost && left_cost < center_cost  && potential_collision_left == false)
-				{
-					state = "CHANGE_LANE_LEFT";
-				}
-				else
-				{
-					state = "TRACK_GAP";
-				}
-				*/
-
-            		vector<float> lane_costs = calc_lane_costs(49.5, lane_speeds);
-
-            		switch(lane){
-            			case 0:
-            				if(lane_costs[lane]>lane_costs[lane+1] && lane_collisions[lane+1] == 0){
-            					lane = lane +1;
-            					state = "FOLLOW_LANE";
-            					too_close = false;
-            				}
-
-            				break;
-            			case 1:
-            				if(lane_costs[lane]>lane_costs[lane-1] && lane_collisions[lane-1] == 0){
-            					lane = lane -1 ;
-            					state = "FOLLOW_LANE";
-            					too_close = false;
-            				}
-            				else if(lane_costs[lane]>lane_costs[lane+1]  && lane_collisions[lane+1] == 0){
-            					lane = lane + 1 ;
-            					state = "FOLLOW_LANE";
-            					too_close = false;
-            				}
-            				break;
-            			case 2:
-            				if(lane_costs[lane]>lane_costs[lane-1] && lane_collisions[lane-1] == 0){
-            					lane = lane -1 ;
-            					state = "FOLLOW_LANE";
-            					too_close = false;
-            				}
-            			break;
+            		else if(ref_vel<target_vehicle_velocity + 5)
+            		{
+            			// increase velocity in case target vehicle accelerates
+            		    ref_vel = ref_vel + 0.3;
             		}
 
-            		/*if(lane != best_lane){
-            			lane = best_lane;
-
+            		if(state_timer > 0){
+            			// decrement state timer
+            			state_timer= state_timer - 1;
             		}
-            		*/
+
+
+            		if (lane != next_lane && state_timer<=0)
+            		{
+            			lane = next_lane;
+            			state = "FOLLOW_LANE";
+            			target_vehicle_present = false;
+            			state_timer= 150;
+            		}
              }
-
-             else if("CHANGE_LANE_RIGHT" == state){
-            	 	 lane = lane +1;
-            	 	 state = "FOLLOW_LANE";
-             }
-             else if("CHANGE_LANE_LEFT" == state){
-            	 	 lane = lane-1;
-                 state = "FOLLOW_LANE";
-              }
-
-             cout << "STATE: " << state << endl;
-
 
              if(prev_size < 2)
              {
-            	 	 //not enough points on path to be used
+            	 	 // not enough points on path to be used
             	 	 // initiate path (starting point is vehicle's pose)
 
             	 	 // since no previous points are available, create one previous point using the tangent points
@@ -640,7 +659,7 @@ int main() {
 			// derive a constant velocity using evenly distanced spline points
 			// constant execution cycle time && ref velocity -> decrease in velocity with increase of distance between points
 			//  == the distance of points represents the velocity
-			double target_x = 50.0;
+			double target_x = 30.0;
 			double target_y = s(target_x);
 			double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
 
