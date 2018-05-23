@@ -280,13 +280,13 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  //initial lane no.
+  // initial lane no.
   int lane = 1;
   // reference velocity
-  float ref_vel = 0;
+  float ego_velocity = 0;
   // target velocity
   float const target_velocity = 49.5;
- // state
+  // state
   string state = "FOLLOW_LANE";
   // target vehicle velocity
   float target_vehicle_velocity = 0;
@@ -294,7 +294,7 @@ int main() {
   float left_lane_velocity = 0;
   // right lane velocity
   float right_lane_velocity = 0;
-
+  // state change delay
   int state_timer = 100;
 
   h.onMessage([&](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -336,12 +336,14 @@ int main() {
 
           	json msgJson;
 
+// ################ Start of project specific changes ################
+
              vector<double> ptsx;
              vector<double> ptsy;
 
-             double ref_x = car_x;
-             double ref_y = car_y;
-             double ref_yaw = deg2rad(car_yaw);
+             double ego_x = car_x;
+             double ego_y = car_y;
+             double ego_yaw = deg2rad(car_yaw);
 
              int prev_size = previous_path_x.size();
 
@@ -361,10 +363,6 @@ int main() {
              lane_velocities[lane] = car_speed;
 
              int collision_zone_left_d = 0;
-                     	 		int left_s = 0;
-                     	 		int center_d = 0;
-                     	 		int right_d = 0;
-                     	 		int right_s = 0;
              for(unsigned int i = 0; i < sensor_fusion.size(); i++)
              {
             	 	 /** sensor_fusion explained:
@@ -395,8 +393,8 @@ int main() {
             	 	 // center of each lane is at 2m
             	 	 // the buffer below covers the whole lane
 
+        	 		 // this assumption is correct as no objects from the opposite lanes are included in the fusion list
             	 	int left_lane = lane - 1;
-
             	 	int right_lane = lane + 1;
 
             	 	// left lane (never true if EGO is in the left most lane)
@@ -419,7 +417,6 @@ int main() {
 						potential_collision_left = true;
 						lane_collisions[left_lane] = 1;
 						collision_zone_left_d = dynamic_object_d;
-						left_s = dynamic_object_s;
 					}
 				}
 
@@ -441,8 +438,6 @@ int main() {
 					// this car is behind or next to me
 					potential_collision_right = true;
 					lane_collisions[right_lane] = 1;
-					right_d = dynamic_object_d;
-					right_s = dynamic_object_s;
 					}
 				}
 
@@ -462,11 +457,9 @@ int main() {
             	 	 }
              }
 
-
   			vector<float> lane_costs = calc_lane_costs(target_velocity, lane_velocities, potential_target_distance);
 			vector<int> possible_lanes = get_feasible_lane_change(lane);
 			int next_lane = get_next_lane(lane_costs, possible_lanes, lane_collisions, lane);
-
 
 			cout << "####### PLANNING INFO #########" << endl;
 			cout << "----- Left lane ----" << endl;
@@ -494,10 +487,10 @@ int main() {
              	 }
              	 else
              	 {
-             		 if(ref_vel < target_velocity)
+             		 if(ego_velocity < target_velocity)
              		 {
              			 // keep velocity
-             		     ref_vel = ref_vel + 0.5;
+             		     ego_velocity = ego_velocity + 0.5;
              		  }
              	 }
              	if(state_timer > 0){
@@ -508,15 +501,15 @@ int main() {
 
              else if("TRACK_GAP" == state)
              {
-            		if(ref_vel>target_vehicle_velocity)
+            		if(ego_velocity>target_vehicle_velocity)
             		{
             			// decrease velocity
-            			ref_vel = ref_vel - 0.3;
+            			ego_velocity = ego_velocity - 0.3;
             		}
-            		else if(ref_vel<target_vehicle_velocity + 10)
+            		else if(ego_velocity<target_vehicle_velocity + 10)
             		{
             			// increase velocity in case target vehicle accelerates
-            		    ref_vel = ref_vel + 0.2;
+            			ego_velocity = ego_velocity + 0.2;
             		}
 
             		if(state_timer > 0){
@@ -534,6 +527,7 @@ int main() {
             		}
              }
 
+             /* The following part has been implemented based on the tutorial */
              if(prev_size < 2)
              {
             	 	 // not enough points on path to be used
@@ -552,58 +546,58 @@ int main() {
              }
              else
              {
-            	 	 ref_x = previous_path_x[prev_size-1];
-            	 	 ref_y = previous_path_y[prev_size-1];
+            	 	 ego_x = previous_path_x[prev_size-1];
+            	 	 ego_y = previous_path_y[prev_size-1];
 
-            	 	 double ref_x_prev = previous_path_x[prev_size-2];
-            	 	 double ref_y_prev = previous_path_y[prev_size-2];
-            	 	 ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+            	 	 double ego_x_prev = previous_path_x[prev_size-2];
+            	 	 double ego_y_prev = previous_path_y[prev_size-2];
+            	 	 ego_yaw = atan2(ego_y - ego_y_prev, ego_x - ego_x_prev);
 
-            	 	 ptsx.push_back(ref_x_prev);
-            	 	 ptsx.push_back(ref_x);
+            	 	 ptsx.push_back(ego_x_prev);
+            	 	 ptsx.push_back(ego_x);
 
-            	 	 ptsy.push_back(ref_y_prev);
-            	 	 ptsy.push_back(ref_y);
+            	 	 ptsy.push_back(ego_y_prev);
+            	 	 ptsy.push_back(ego_y);
 
              }
             int dist_between_points = 30;
 
             //get next 3 points
-            vector<double> next_wp0 = getXY(car_s+dist_between_points,
+            vector<double> next_waypoint0 = getXY(car_s+dist_between_points,
             										(2+4*lane),
             											map_waypoints_s,
 														map_waypoints_x,
 															map_waypoints_y);
 
-            vector<double> next_wp1 = getXY(car_s+2*dist_between_points,
+            vector<double> next_waypoint1 = getXY(car_s+2*dist_between_points,
                         										(2+4*lane),
                         											map_waypoints_s,
             														map_waypoints_x,
             															map_waypoints_y);
 
-            vector<double> next_wp2 = getXY(car_s+3*dist_between_points,
+            vector<double> next_waypoint2 = getXY(car_s+3*dist_between_points,
                         										(2+4*lane),
                         											map_waypoints_s,
             														map_waypoints_x,
             															map_waypoints_y);
 
-            ptsx.push_back(next_wp0[0]);
-            ptsx.push_back(next_wp1[0]);
-            ptsx.push_back(next_wp2[0]);
+            ptsx.push_back(next_waypoint0[0]);
+            ptsx.push_back(next_waypoint1[0]);
+            ptsx.push_back(next_waypoint2[0]);
 
-            ptsy.push_back(next_wp0[1]);
-            ptsy.push_back(next_wp1[1]);
-            ptsy.push_back(next_wp2[1]);
+            ptsy.push_back(next_waypoint0[1]);
+            ptsy.push_back(next_waypoint1[1]);
+            ptsy.push_back(next_waypoint2[1]);
             // --> now there are 5 points in the vector
 
             for(unsigned int i = 0; i < ptsx.size(); i++)
             {
-            		double delta_x = ptsx[i] - ref_x;
-            		double delta_y = ptsy[i] - ref_y;
+            		double delta_x = ptsx[i] - ego_x;
+            		double delta_y = ptsy[i] - ego_y;
 
           	  	// rotate map relative coordinates into car relative coordinates
-          	  	ptsx[i] = delta_x * cos(0 - ref_yaw) - delta_y * sin(0 - ref_yaw);
-          	  	ptsy[i] = delta_x * sin(0 - ref_yaw) + delta_y * cos(0 - ref_yaw);
+          	  	ptsx[i] = delta_x * cos(0 - ego_yaw) - delta_y * sin(0 - ego_yaw);
+          	  	ptsy[i] = delta_x * sin(0 - ego_yaw) + delta_y * cos(0 - ego_yaw);
             }
 
             // define spline
@@ -615,7 +609,7 @@ int main() {
             vector<double> next_x_vals;
 			vector<double> next_y_vals;
 
-			// if a previous path exist, use its points and add them to the next path
+			// if a previous path exist, use its points and add them to the next path ("stitching")
 			// the previous_path_x/_y represents the points on the previous path that have not been reached
 			// --> enables smooth transitions between paths
 			for(unsigned int i = 0; i < previous_path_x.size(); i++)
@@ -635,31 +629,32 @@ int main() {
 			double x_add_on = 0.0;
 
 			// N = amount of points along the line from car origin until target_dist
-			double N = (target_dist/(0.02 * (ref_vel / 2.24)));
+			double N = (target_dist/(0.02 * (ego_velocity / 2.24)));
 
 			for(int i = 0; i < 50 - previous_path_x.size(); i++)
 			{
 				// next x point
-				double x_point = x_add_on + (target_x) / N;
+				double next_x_point = x_add_on + (target_x) / N;
 				// next y point
-				double y_point = ego_spline(x_point);
+				double next_y_point = ego_spline(next_x_point);
 
 				// move to next point
-				x_add_on = x_point;
+				x_add_on = next_x_point;
 
-				double x_ref = x_point;
-				double y_ref = y_point;
+				double x_temp = next_x_point;
+				double y_temp = next_y_point;
 
 				// rotate into map coordinates
-				x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
-				y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
+				next_x_point = (x_temp * cos(ego_yaw) - y_temp * sin(ego_yaw));
+				next_y_point = (x_temp * sin(ego_yaw) + y_temp * cos(ego_yaw));
 
-				x_point += ref_x;
-				y_point += ref_y;
+				next_x_point += ego_x;
+				next_y_point += ego_y;
 
-				next_x_vals.push_back(x_point);
-				next_y_vals.push_back(y_point);
+				next_x_vals.push_back(next_x_point);
+				next_y_vals.push_back(next_y_point);
 			}
+// ################ End of project specific changes ################
 
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
