@@ -62,7 +62,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     # 1x1 convolution of layer 7 in frozen graph
     conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, 
                                        num_classes, 
-                                       strides = (1, 1), 
+                                       1, 
                                        padding='same', 
                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
     
@@ -78,7 +78,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     # 1x1 convolution of layer 4 in frozen graph
     conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, 
                                        num_classes, 
-                                       strides = (1, 1), 
+                                       1, 
                                        padding='same', 
                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
     # skip connection of layer 7 deconvolution and layer 4 1x1 convolution
@@ -95,7 +95,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     # 1x1 convolution of layer 3 in frozen graph                                                                
     conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, 
                                        num_classes, 
-                                       strides = (1, 1), 
+                                       1, 
                                        padding='same', 
                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
     
@@ -126,17 +126,17 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # reduce dimension
-    logits = tf.reshape(nn_last_layer, (-1, num_classes));
-    labels = tf.reshape(correct_label, (-1, num_classes));
+    logits_arg = tf.reshape(nn_last_layer, (-1, num_classes));
+    labels_arg = tf.reshape(correct_label, (-1, num_classes));
     
     # define cross entropy loss based on logits and labels
-    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, labels))
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits_arg, labels=labels_arg))
     # define the optimizer
-    optimizer = tf.train.AdamOptimizer(learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # train
     training_operation = optimizer.minimize(cross_entropy_loss)
     
-    return logits, training_operation, cross_entropy_loss
+    return logits_arg, training_operation, cross_entropy_loss
 
 tests.test_optimize(optimize)
 
@@ -156,14 +156,20 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
+    # initialize variables prior to training
+    sess.run(tf.global_variables_initializer())
+    # train
+    
     print("#############")
     print("Training started ... ")
-    for epochs in epochs:
+    for epoch in range(epochs):
         for image, label in get_batches_fn(batch_size):
             _, loss = sess.run([train_op, cross_entropy_loss], 
-                               feed_dict = {input_image: image, correct_label: label, keep_prob: keep_prob, learning_rate: learning_rate })
+                               feed_dict = {input_image: image, correct_label: label, keep_prob: 0.5, learning_rate: 0.000002 })
             print(loss) 
-        print("Run no. " + epochs + "\n")
+        print("Run no. ")
+        print(epoch)
+        print("\n")
 tests.test_train_nn(train_nn)
 
 
@@ -195,14 +201,14 @@ def run():
         # get the FCN
         deconvoluted_input = layers(w_layer3, w_layer4, w_layer7, num_classes);
         # define a variable for the label
-        correct_label = tf.placeholder(tf.int32, shape = (None, None, num_classes));
+        correct_label = tf.placeholder(tf.int32, shape = (None, None, None, num_classes));
         # define a variable for the learning rate
         learning_rate = tf.placeholder(tf.float32);
         # start optimizer
         logits, training_operation, cross_entropy_loss = optimize(deconvoluted_input, correct_label, learning_rate, num_classes);
         #define batch and epochs
-        epochs = 100;
-        batch_size = 10;
+        epochs = 20;
+        batch_size = 5;
         #train model
         train_nn(sess, 
                  epochs, 
