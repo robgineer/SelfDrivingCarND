@@ -207,8 +207,8 @@ def run():
         # start optimizer
         logits, training_operation, cross_entropy_loss = optimize(deconvoluted_input, correct_label, learning_rate, num_classes);
         #define batch and epochs
-        epochs = 20;
-        batch_size = 5;
+        epochs = 36;
+        batch_size = 6;
         #train model
         train_nn(sess, 
                  epochs, 
