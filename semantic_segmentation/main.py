@@ -63,24 +63,27 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     conv_1x1_layer7 = tf.layers.conv2d(vgg_layer7_out, 
                                        num_classes, 
                                        1, 
-                                       padding='same', 
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
+                                       padding='same',
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                       kernel_initializer=tf.truncated_normal_initializer(stddev=0.01));
     
     # deconvolution of layer 7 1x1 output
     deconvolution_output_layer7 = tf.layers.conv2d_transpose(conv_1x1_layer7, 
                                                             num_classes, 
                                                             4,
                                                             strides = (2,2), 
-                                                            padding='same', 
-                                                            kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
+                                                            padding='same',
+                                                            kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                                            kernel_initializer=tf.truncated_normal_initializer(stddev=0.01));
     
     
     # 1x1 convolution of layer 4 in frozen graph
     conv_1x1_layer4 = tf.layers.conv2d(vgg_layer4_out, 
                                        num_classes, 
                                        1, 
-                                       padding='same', 
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
+                                       padding='same',
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                       kernel_initializer=tf.truncated_normal_initializer(stddev=0.01));
     # skip connection of layer 7 deconvolution and layer 4 1x1 convolution
     skip_layer4_layer7 = tf.add(deconvolution_output_layer7, conv_1x1_layer4);
     
@@ -90,14 +93,16 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                                            4,
                                                            strides = (2,2), 
                                                            padding='same', 
-                                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
+                                                           kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                                           kernel_initializer=tf.truncated_normal_initializer(stddev=0.01));
    
     # 1x1 convolution of layer 3 in frozen graph                                                                
     conv_1x1_layer3 = tf.layers.conv2d(vgg_layer3_out, 
                                        num_classes, 
                                        1, 
                                        padding='same', 
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
+                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                       kernel_initializer=tf.truncated_normal_initializer(stddev=0.01));
     
     # skip connection deconvolution last skip and layer 4 1x1 convolution
     skip_deconvolution_skip_layer_conv_1x1_layer3 = tf.add(deconvolution_skip_layer, conv_1x1_layer3);
@@ -107,8 +112,9 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                                      num_classes, 
                                                      16,
                                                      strides = (8,8), 
-                                                     padding='same', 
-                                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3));
+                                                     padding='same',
+                                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                                     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01));
 
     return final_deconvolution
 
@@ -131,10 +137,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     
     # define cross entropy loss based on logits and labels
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits_arg, labels=labels_arg))
+    
+    # the regulaization loss has been taken over from https://stackoverflow.com/questions/37107223/how-to-add-regularizations-in-tensorflow
+    #l2_loss = 0.01 * tf.add_n([tf.nn.l2_loss(tf.cast(v, tf.float32)) for v in tf.trainable_variables()]);
+    #loss = cross_entropy_loss + l2_loss
+    
     # define the optimizer
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     # train
     training_operation = optimizer.minimize(cross_entropy_loss)
+    #training_operation = optimizer.minimize(loss)
     
     return logits_arg, training_operation, cross_entropy_loss
 
@@ -165,7 +177,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     for epoch in range(epochs):
         for image, label in get_batches_fn(batch_size):
             _, loss = sess.run([train_op, cross_entropy_loss], 
-                               feed_dict = {input_image: image, correct_label: label, keep_prob: 0.5, learning_rate: 0.002 })
+                               feed_dict = {input_image: image, correct_label: label, keep_prob: 0.5, learning_rate: 0.0001 })
             print(loss) 
         print("Run no. ")
         print(epoch)
