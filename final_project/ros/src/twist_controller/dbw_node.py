@@ -56,10 +56,10 @@ class DBWNode(object):
         # TODO: Create `Controller` object
         self.controller = Controller(vehicle_mass=vehicle_mass,
                                      fuel_capacity=fuel_capacity,
-                                     brake_deadband=brakedeadband,
+                                     brake_deadband=brake_deadband,
                                      decel_limit=decel_limit,
                                      accel_limit=accel_limit,
-                                     Wheel_radius=wheel_radius,
+                                     wheel_radius=wheel_radius,
                                      wheel_base=wheel_base,
                                      steer_ratio=steer_ratio,
                                      max_lat_accel=max_lat_accel,
@@ -87,10 +87,10 @@ class DBWNode(object):
             if not None in (self.current_vel, self.linear_vel, self.angular_vel):
 
                 self.throttle, self.brake, self.steering = \
-				self.controller.control(self.current_vel,
-                                                        self.dbw_enabled,
-                                                        self.linear_vel,
-                                                        self.angular_vel)
+				self.controller.control(self.linear_vel,
+                                                        self.angular_vel,
+                                                        self.current_vel,
+                                                        self.dbw_enabled)
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
             rate.sleep()
