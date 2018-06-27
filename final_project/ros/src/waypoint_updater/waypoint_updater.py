@@ -19,6 +19,7 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 200  # Number of waypoints we will publish. You can change this number
+MAX_DECEL = 1.0
 
 
 class WaypointUpdater(object):
@@ -31,11 +32,13 @@ class WaypointUpdater(object):
         # /base_waypoints represent
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         self.ego_pose = None
+        self.stopline_wp_idx = -1
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
@@ -82,6 +85,44 @@ class WaypointUpdater(object):
             closest_index = (closest_index + 1) % len(self.waypoints_2d)
         return closest_index
 
+    def publish_waypoints(self):
+        final_lane = self.generate_lane()
+        self.final_waypoints_pub.publish(final_lane)
+
+    def generate_lane(self):
+        lane = Lane()
+        
+        closest_idx = self.get_closest_waypoint_idx()
+        farthest_idx = closest_idx + LOOKAHEAD_WPS
+        base_waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+        
+        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
+            lane.waypoints = base_waypoints
+        else:
+            lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
+            
+        return lane
+
+    def decelerate_waypoints(self, waypoints, closest_idx):
+        decel_wps = []
+        for i, wp in enumerate(waypoints):
+        
+            p = Waypoint()
+            p.pose = wp.pose
+            
+            # Stop 2 waypoints back from line so front of car stops at line
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            dist = self.distance(waypoints, i, stop_idx)
+            vel = math.sqrt(2 * MAX_DECEL * dist)
+            if vel < 1.:
+                vel == 0.
+            
+            # make sure not to go faster than speed limit (already considered in wp.twist.twist.linear.x)
+            p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
+            decel_wps.append(p)
+            
+        return decel_wps
+
     def pose_cb(self, msg):
         self.ego_pose = msg
 
@@ -104,7 +145,7 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
