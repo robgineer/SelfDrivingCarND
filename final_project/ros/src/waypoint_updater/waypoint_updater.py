@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
+from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 from scipy.spatial import KDTree
@@ -42,6 +43,7 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
+        rospy.loginfo("OLAF: {}, {}".format(self.ego_pose, self.stopline_wp_idx))
 
         # don't need spin(). Replaced by loop().
         # rospy.spin()
@@ -59,11 +61,9 @@ class WaypointUpdater(object):
         while not rospy.is_shutdown():
             # asynchronous thread execution: check if variables have been initialized
             # (avoid potential access to undefined variables)
-            if self.ego_pose is None or self.base_waypoints is None or self.waypoint_tree is None:
-                continue
+            if not self.ego_pose is None and not self.base_waypoints is None and not self.waypoint_tree is None:
                 # publish closest waypoint
-            next_wpt_idx = self.get_next_waypoint_idx()
-            self.publish_nxt_waypoints(next_wpt_idx)
+                self.publish_waypoints()
             # got to sleep for 20ms
             execution_freq.sleep()
 
@@ -92,7 +92,7 @@ class WaypointUpdater(object):
     def generate_lane(self):
         lane = Lane()
         
-        closest_idx = self.get_closest_waypoint_idx()
+        closest_idx = self.get_next_waypoint_idx()
         farthest_idx = closest_idx + LOOKAHEAD_WPS
         base_waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
         
