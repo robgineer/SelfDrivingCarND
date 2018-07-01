@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CarND Object Detection Lab
 
 ![](assets/clip.gif)
@@ -45,3 +46,6 @@ https://conda.io/docs/using/envs.html#remove-an-environment
 
 ### Tips
 - Some windows users have reported the driving video as playable only in Jupyter Notebook operating in Chrome browser, and not in media player or Jupyter Notebook operating in other browsers.  In contrast the post-segmentation video appears to be operating accross players and browsers.
+=======
+# Traffic_Light_Detection
+>>>>>>> 13c6022cf382b09e396776d289c16b7f8841e757
