@@ -19,7 +19,7 @@ class TLClassifier(object):
         if model_path is None:
             rp = rospkg.RosPack()
             # model folder in tl_detector folder
-            model_path = os.path.join(rp, os.path.join(os.getcwd(), os.pardir), 'model')
+            model_path = os.path.join(rp, os.path.join(os.getcwd()), 'model')
 
         detection_model_path = os.path.join(model_path, 'model_detection.pb')
         classification_model_path = os.path.join(model_path, 'model_classification.pb')
