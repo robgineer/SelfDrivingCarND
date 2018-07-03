@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import cv2
+import rospkg
 
 TRAFFIC_LIGHT_LABEL = 10
 
@@ -18,7 +19,7 @@ class TLClassifier(object):
         if model_path is None:
             rp = rospkg.RosPack()
             # model folder in tl_detector folder
-            model_path = os.path.join(rp, get_path('tl_detector'), 'model')
+            model_path = os.path.join(rp, os.path.join(os.getcwd(), os.pardir), 'model')
 
         detection_model_path = os.path.join(model_path, 'model_detection.pb')
         classification_model_path = os.path.join(model_path, 'model_classification.pb')
@@ -26,8 +27,8 @@ class TLClassifier(object):
 
        # self.config = tf.ConfigProto()  # protocol msgs
         # load graphs
-        self.detection_graph = load_graph(detection_model_path)
-        self.classification_graph = load_graph(classification_model_path)
+        self.detection_graph = self.load_graph(detection_model_path)
+        self.classification_graph = self.load_graph(classification_model_path)
 
         self.image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
         self.detection_boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
