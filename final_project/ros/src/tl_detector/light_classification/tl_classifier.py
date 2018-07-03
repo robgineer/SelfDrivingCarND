@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import cv2
-import rospkg
+#import rospkg
 
 TRAFFIC_LIGHT_LABEL = 10
 
@@ -17,9 +17,9 @@ class TLClassifier(object):
         # the lines below have been modified based on the tutotial in https://github.com/udacity/CarND-Object-Detection-Lab
 
         if model_path is None:
-            rp = rospkg.RosPack()
+            #rp = rospkg.RosPack()
             # model folder in tl_detector folder
-            model_path = os.path.join(rp, os.path.join(os.getcwd()), 'model')
+            model_path = os.path.join(os.pardir, 'model')
 
         detection_model_path = os.path.join(model_path, 'model_detection.pb')
         classification_model_path = os.path.join(model_path, 'model_classification.pb')
