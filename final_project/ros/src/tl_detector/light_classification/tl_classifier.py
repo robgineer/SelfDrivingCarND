@@ -9,11 +9,16 @@ TRAFFIC_LIGHT_LABEL = 10
 
 
 class TLClassifier(object):
-    def __init__(self):
+    def __init__(self, model_path = None):
         # TODO load classifier
 
         # loading SSD for the localization of traffic lights
         # the lines below have been modified based on the tutotial in https://github.com/udacity/CarND-Object-Detection-Lab
+
+        if model_path is None:
+            rp = rospkg.RosPack()
+            # model folder in tl_detector folder
+            model_path = os.path.join(rp, get_path('tl_detector'), 'model')
 
         detection_model_path = os.path.join(model_path, 'model_detection.pb')
         classification_model_path = os.path.join(model_path, 'model_classification.pb')
@@ -70,12 +75,12 @@ class TLClassifier(object):
                     return TrafficLight.YELLOW
                 elif state == 1:
                     state = TrafficLight.GREEN
-        # returns green only if RED and YELLOW have not been detected
+        # returns green only if RED and YELLOW have not been detected in any cropped image
          return state
 
     def tl_detection(self, image):
         h_, w_, _ = image.shape
-        print("checkpoint img shape: {}".format(image.shape))
+       # print("checkpoint img shape: {}".format(image.shape))
         image_np = np.expand_dims(image, axis=0)
         # with tf.Session(graph=self.detection_graph) as sess:
         with self.sess_detection.as_default(), self.detection_graph.as_default():
@@ -121,7 +126,6 @@ class TLClassifier(object):
         for i in range(n):
             if scores[i] >= min_score:
                 idxs.append(i)
-
         filtered_boxes = boxes[idxs, ...]
         filtered_scores = scores[idxs, ...]
         filtered_classes = classes[idxs, ...]
