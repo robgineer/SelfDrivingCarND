@@ -25,7 +25,7 @@ class TLClassifier(object):
         classification_model_path = os.path.join(model_path, 'model_classification.pb')
         # check if models exists and output error?
 
-       # self.config = tf.ConfigProto()  # protocol msgs
+        self.config = tf.ConfigProto()  # protocol msgs
         # load graphs
         self.detection_graph = self.load_graph(detection_model_path)
         self.classification_graph = self.load_graph(classification_model_path)
