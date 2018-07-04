@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import cv2
-#import rospkg
+import rospy
 
 TRAFFIC_LIGHT_LABEL = 10
 
@@ -42,6 +42,7 @@ class TLClassifier(object):
         self.in_graph = self.classification_graph.get_tensor_by_name('input_1:0')
         self.out_graph = self.classification_graph.get_tensor_by_name('output_0:0')
 
+        rospy.loginfo("loading done...")
         # Create Output from classification
         # self.index2msg = {0: TrafficLight.GREEN, 1: TrafficLight.RED, 2: TrafficLight.YELLOW}
 
