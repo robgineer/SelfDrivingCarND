@@ -22,7 +22,7 @@ class TLClassifier(object):
             model_path = os.path.join(os.path.dirname(os.getcwd()), 'model')
 
         detection_model_path = os.path.join(model_path, 'model_detection.pb')
-        classification_model_path = os.path.join(model_path, 'model_classification.pb')
+        classification_model_path = os.path.join(model_path, 'model_classification_carla_tf130.pb')
         # check if models exists and output error?
 
         self.config = tf.ConfigProto()  # protocol msgs
