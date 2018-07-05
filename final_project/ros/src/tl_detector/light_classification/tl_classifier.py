@@ -169,6 +169,6 @@ class TLClassifier(object):
             # crop image and store into list
             if class_id == TRAFFIC_LIGHT_LABEL:
                 img2 = img.copy()
-                img2 = img2[int(y1):int(x1), int(y2):int(x2)]
+                img2 = img2[int(y1):int(y2), int(x1):int(x2)]
                 listofimages.append(img2)
         return listofimages
