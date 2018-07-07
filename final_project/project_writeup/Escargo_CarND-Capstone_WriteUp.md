@@ -10,7 +10,7 @@ First, the code is tested on the simulator and then we ran it on Carla. The code
 ## 2. Architecture
 To-Do insert architecture images
 
-![alt text](imgs/architecture.png "Architecture")
+![alt text](imgs/architecture.PNG "Architecture")
 
 The system architecture comprises three subsystems.
 
@@ -27,14 +27,14 @@ The subsystems are joint by ROS topics. For example we publish to the topic vehi
 
 The Perception subsystem takes sensor data, more precise camera images, and produces meaningful information such as the traffic light state (red/yellow/green).
 
-![alt text](imgs/perception.png "Perception")
+![alt text](imgs/perception.PNG "Perception")
 
 As shown the Perception subsystem has two ROS nodes, the Obstacle Detection and Traffic Light Detection node. The Obstacle Detection node is not required for the Capstone project as of now. The Traffic Light Detection node comprises of two parts
 
 1. Detect traffic lights in input camera image
 2. Classify the color of the found traffic light
 
-![alt text](imgs/tld_node.png "Traffic Light Detection Node")
+![alt text](imgs/tld_node.PNG "Traffic Light Detection Node")
 
 The mentioned parts are described in more detail hereafter.
 
@@ -68,14 +68,14 @@ Once the classification is done as described above, we publish the waypoints of 
 
 The Planning subsystem reads in the outputs of the file data in simulator modus or radar/lidar sensor data in real road application on Carla. The Perception subsystem outputs the traffic_waypoint and obstacle_waypoint information. The obstacle_waypoint functionality is not covered in this document since it is not required for the project (might be added in the future).
 
-![alt text](imgs/planning.png "Planning")
+![alt text](imgs/planning.PNG "Planning")
 
 The Waypoint Loader reads in the waypoint values, position x, y & z and yaw information from a file (simulator) or sensor data (Carla). 
 
 MORE INFOS...
 ![alt text](imgs/placeholder.png "PH")
 
-![alt text](imgs/wpu_node.png "Way Point Updater")
+![alt text](imgs/wpu_node.PNG "Way Point Updater")
 
 The Waypoint Updater node shown above as two functions.
 ....
@@ -91,11 +91,11 @@ The Waypoint Updater node shown above as two functions.
 The Control subsystem takes the path planned by the Planning subsystem described before and issues the commands for throttle/acceleration, brake and steering of the vehicle. 
 It is a DBW Node, DBW stands for drive-by-wire and means the throttle/brake/steering of the vehicle can be controlled electronically through software without a mechanical joint.
 
-![alt text](imgs/control.png "Control")
+![alt text](imgs/control.PNG "Control")
 
 As shown in the diagram the Control subsystem comprises two ROS nodes, the Waypoint Follower and the DBW Node. The Waypoint follower is already implemented in the provided project code. It takes the waypoints by the Planning subsystem as inputs and outputs a target linear and angular velocity by taking into account obstacles like traffic lights.
 
-![alt text](imgs/dbw_node.png "DBW")
+![alt text](imgs/dbw_node.PNG "DBW")
 
 Within the DBW node the described target linear and angular velocities (/twist_cmd) are processed with the current velocity (/current_velocity), current location (/current_pose) of the vehicle and the final waypoints (/final_waypoints) as inputs and fed into a stanard PID controller, described below.
 
