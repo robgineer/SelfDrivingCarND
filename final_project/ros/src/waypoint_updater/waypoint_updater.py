@@ -56,7 +56,7 @@ class WaypointUpdater(object):
         # publish closest waypoint every 20ms and pause execution
 
         # define the cycle time of this module
-        execution_freq = rospy.Rate(50)  # value taken over from tutorial
+        execution_freq = rospy.Rate(10)  # value taken over from tutorial
 
         # check if roscore is active
         while not rospy.is_shutdown():
@@ -88,7 +88,7 @@ class WaypointUpdater(object):
 
     def publish_waypoints(self):
         final_lane = self.generate_lane()
-        rospy.loginfo("final_lane.waypoints: {}".format(final_lane.waypoints))
+        #rospy.loginfo("final_lane.waypoints: {}".format(final_lane.waypoints))
         self.final_waypoints_pub.publish(final_lane)
 
     def generate_lane(self):
@@ -103,7 +103,7 @@ class WaypointUpdater(object):
         else:
             lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
 
-        rospy.loginfo("lane.waypoints: {}".format(lane.waypoints))
+        #rospy.loginfo("lane.waypoints: {}".format(lane.waypoints))
             
         return lane
 
@@ -114,9 +114,10 @@ class WaypointUpdater(object):
             p = Waypoint()
             p.pose = wp.pose
             
-            # Stop 2 waypoints back from line so front of car stops at line
-            stop_idx = max(self.stopline_wp_idx - closest_idx - 4, 0)
-            dist = self.distance(waypoints, i, stop_idx)
+            # make distance to stopline independent of waypoint distance
+            # Stop 3 m back from line so front of car stops at line
+            stop_idx = self.stopline_wp_idx - closest_idx
+            dist = max(self.distance(waypoints, i, stop_idx) - 3, 0)
             vel = math.sqrt(2 * MAX_DECEL * dist)
             if vel < 1.:
                 vel == 0.
