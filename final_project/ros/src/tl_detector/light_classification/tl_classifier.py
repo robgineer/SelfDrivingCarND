@@ -57,7 +57,7 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RBG)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         state = None
         cropped_img_lst = self.tl_detection(image)
         if cropped_img_lst is None:
