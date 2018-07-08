@@ -67,7 +67,7 @@ class TLClassifier(object):
                 #classsify state
                 traffic_light = cv2.resize(cropped_image, (32, 32))
                 state = self.classify_it(traffic_light)
-                rospy.loginfo("traffic light color: {}".format(state))
+                rospy.loginfo("classified traffic light color: {}".format(state))
                 # traffic light is RED
                 if state == 0:
                     # even if only one traffic light is classified as red, return RED
@@ -106,7 +106,7 @@ class TLClassifier(object):
             box_coords = self.to_image_coords(boxes, h_, w_)
             # Each class with be represented by a differently colored box
             # draw_boxes(image, box_coords, classes)
-            print("len classes: {}, len boxes: {}".format(len(classes), len(boxes)))
+            #print("len classes: {}, len boxes: {}".format(len(classes), len(boxes)))
             return self.extract(image, box_coords, classes)
 
     def classify_it(self, image):

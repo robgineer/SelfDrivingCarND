@@ -14,6 +14,7 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 
+ROSBAG_TEST = False
 
 class TLDetector(object):
     def __init__(self):
@@ -77,9 +78,16 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
+
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
+
+        if ROSBAG_TEST:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+            # Get classification
+            self.light_classifier.get_classification(cv_image)
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -124,16 +132,15 @@ class TLDetector(object):
         """
         # For testing in the simulator, just return the light state
         # return light.state
-        rospy.loginfo("calling detection")
         if (not self.has_image):
-            self.prev_light_loc = None
+            self.last_state = None
             return False
 
-        rospy.loginfo("bridge access")
+        rospy.loginfo("conversion of camera image")
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         # Get classification
-        rospy.loginfo("traffic light classified")
+        rospy.loginfo("calling traffic light classifier")
         return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
