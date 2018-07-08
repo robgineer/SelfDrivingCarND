@@ -14,6 +14,7 @@ import yaml
 
 STATE_COUNT_THRESHOLD = 3
 
+
 class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
@@ -46,7 +47,6 @@ class TLDetector(object):
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
-
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
@@ -109,7 +109,7 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
+        # TODO implement
         return self.waypoint_tree.query([x, y], 1)[1]
 
     def get_light_state(self, light):
@@ -123,16 +123,16 @@ class TLDetector(object):
 
         """
         # For testing in the simulator, just return the light state
-        #return light.state
+        # return light.state
         rospy.loginfo("calling detection")
-        if(not self.has_image):
+        if (not self.has_image):
             self.prev_light_loc = None
             return False
 
         rospy.loginfo("bridge access")
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        #Get classification
+        # Get classification
         rospy.loginfo("traffic light classified")
         return self.light_classifier.get_classification(cv_image)
 
@@ -154,12 +154,12 @@ class TLDetector(object):
             car_wp_idx = self.get_closest_waypoint(self.pose.pose.position.x,
                                                    self.pose.pose.position.y)
 
-            #TODO find the closest visible traffic light (if one exists)
+            # TODO find the closest visible traffic light (if one exists)
             diff = len(self.waypoints.waypoints)
             # self.lights have to be set??
             for i, light in enumerate(self.lights):
-                #print(i, light)
-                #rospy.loginfo("OLAF: {}, {}".format(i, light))
+                # print(i, light)
+                # rospy.loginfo("OLAF: {}, {}".format(i, light))
                 # Get stop line waypoint index
                 line = stop_line_positions[i]
                 temp_wp_idx = self.get_closest_waypoint(line[0], line[1])
@@ -172,12 +172,13 @@ class TLDetector(object):
 
         if closest_light:
             state = self.get_light_state(closest_light)
-            #rospy.loginfo("OLAF: {}, {}".format(line_wp_idx, state))
-            #print(line_wp_idx, state)
+            # rospy.loginfo("OLAF: {}, {}".format(line_wp_idx, state))
+            # print(line_wp_idx, state)
             return line_wp_idx, state
-            
-        #self.waypoints = None
+
+        # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
+
 
 if __name__ == '__main__':
     try:
