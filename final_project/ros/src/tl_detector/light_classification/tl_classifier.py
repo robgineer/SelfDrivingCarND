@@ -22,6 +22,9 @@ class TLClassifier(object):
             # model folder in tl_detector folder
             model_path = os.path.join(os.path.dirname(os.getcwd()), 'model')
 
+        if ROSBAG_TEST:
+            self.iterator_for_test_images = 0
+
         detection_model_path = os.path.join(model_path, 'model_detection.pb')
         classification_model_path = os.path.join(model_path, 'model_classification_carla_tf130_a.pb')
         # check if models exists and output error?
@@ -57,22 +60,19 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         state = None
         cropped_img_lst = self.tl_detection(image)
         if cropped_img_lst is None:
             return TrafficLight.UNKNOWN
         else:
-
-            if ROSBAG_TEST:
-                i = 0
             # iterate trough all found traffic lights
             for cropped_image in cropped_img_lst:
                 # rest for recompute based on rosbag
                 if ROSBAG_TEST:
-                    i = i +1;
-                    name_original_img = 'original_img_' + str(i) + '.png'
-                    name_cropped_img = 'cropped_img_'+str(i)+'.png'
+                    self.iterator_for_test_images = self.iterator_for_test_images + 1
+                    name_original_img = 'original_img_' + str(self.iterator_for_test_images) + '.png'
+                    name_cropped_img = 'cropped_img_'+str(self.iterator_for_test_images)+'.png'
                     cv2.imwrite(name_original_img, image)
                     cv2.imwrite(name_cropped_img, cropped_image)
                 traffic_light = cv2.resize(cropped_image, (32, 32))
