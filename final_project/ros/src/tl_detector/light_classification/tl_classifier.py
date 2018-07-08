@@ -8,6 +8,7 @@ import rospy
 
 TRAFFIC_LIGHT_LABEL = 10
 
+ROSBAG_TEST = False
 
 class TLClassifier(object):
     def __init__(self, model_path = None):
@@ -56,16 +57,26 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RBG)
         state = None
         cropped_img_lst = self.tl_detection(image)
         if cropped_img_lst is None:
             return TrafficLight.UNKNOWN
         else:
-            #iterate trough all found traffic lights
+
+            if ROSBAG_TEST:
+                i = 0
+            # iterate trough all found traffic lights
             for cropped_image in cropped_img_lst:
-                #classsify state
+                # rest for recompute based on rosbag
+                if ROSBAG_TEST:
+                    i = i +1;
+                    name_original_img = 'original_img_' + str(i) + '.png'
+                    name_cropped_img = 'cropped_img_'+str(i)+'.png'
+                    cv2.imwrite(name_original_img, image)
+                    cv2.imwrite(name_cropped_img, cropped_image)
                 traffic_light = cv2.resize(cropped_image, (32, 32))
+                # classsify state
                 state = self.classify_it(traffic_light)
                 rospy.loginfo("classified traffic light color: {}".format(state))
                 # traffic light is RED
