@@ -75,9 +75,10 @@ class TLClassifier(object):
                     name_cropped_img = 'cropped_img_'+str(self.iterator_for_test_images)+'.png'
                     cv2.imwrite(name_original_img, image)
                     cv2.imwrite(name_cropped_img, cropped_image)
-                traffic_light = cv2.resize(cropped_image, (32, 32))
+                #traffic_light = cv2.resize(cropped_image, (32, 32))
                 # classsify state
-                state = self.classify_it(traffic_light)
+                #state = self.classify_it(traffic_light)
+                state = self.get_dominant_region(cropped_image)
                 rospy.loginfo("classified traffic light color: {}".format(state))
                 # traffic light is RED
                 if state == 0:
@@ -126,6 +127,27 @@ class TLClassifier(object):
                 self.sess_classification.run(tf.nn.softmax(self.out_graph.eval(feed_dict={self.in_graph: [image]}))))
             sf_ind = sfmax.index(max(sfmax))
         return sf_ind
+
+    def get_dominant_region(self, image):
+
+        # get gray image
+        gray_img = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        #convert to black and white
+        black_and_white_image = cv2.threshold(gray_img, 150, 255, cv2.THRESH_BINARY)[1]
+        # get one third of x axis
+        onethird_of_x = int(black_and_white_image.shape[0] / 3)
+        # divide
+        part_one = black_and_white_image[0:onethird_of_x][:]
+        part_two = black_and_white_image[onethird_of_x:onethird_of_x * 2][:]
+        part_three = black_and_white_image[onethird_of_x * 2:onethird_of_x * 3][:]
+        # get brightest part
+        red_dominance = np.count_nonzero(part_one)
+        yellow_dominance = np.count_nonzero(part_two)
+        green_dominance = np.count_nonzero(part_three)
+
+        traffic_light = [red_dominance, green_dominance, yellow_dominance]
+        # return state
+        return traffic_light.index(max(traffic_light))
 
     def close(self):
         self.sess.close()
