@@ -47,22 +47,16 @@ The mentioned parts are described in more detail hereafter.
 The Traffic Light Detector part takes the inputs as shown above to detect traffic lights in the camera input images (/image_color).
 To detect the traffic lights we used a pre-trained network Single Shot Multibox Detector (SSD mobile v2). The frozen graph is loaded in the model and images are fed directly throught the graph. The traffic light detection by usage of the described pre-trained model showed a good performance.
 
+More details can be found the the following Jupyter Notebook
+https://github.com/robgineer/Traffic_Light_Detection/blob/master/SSD_extraction.ipynb
+
 #### 3.1.2 Traffic Light Classifier
 The Traffic Light Classifier part classifies the color of the found traffic light. For the simulation the classification is not mandatory. The information can be obtained from the simulator (/vehicle/traffic_lights). For implementing our code on Carla the traffic light classification is required. The following approach was used to build a traffic light classification:
 For classification we implemented SqueezeNet
 
-![alt text](imgs/addinfo.png "PH")
 
-**(TO ADD LINK)**
-
-and trained it with a training set comprising 
-
-**XXX images.**
-
-
- The classifier is described in detail in the following jupyter notebook of our team repo:
-
-**LINK TO JUP NOTEBOOK**
+The classifier is described in detail in the following jupyter notebook of our team repo:
+https://github.com/azumf/CarND-Capstone_TL_Classifier/blob/master/Escargo_classifier_v2_carla.ipynb
 
 We wanted to have a performance comparison of different model approaches but unfortunately this task had to be cancelled due to team member quit.
 
@@ -77,18 +71,15 @@ The Planning subsystem reads in the outputs of the file data in simulator modus 
 The Waypoint Loader reads in the waypoint values, position x, y & z and yaw information from a file (simulator) or sensor data (Carla). 
 
 MORE INFOS...
-![alt text](imgs/placeholder.png "PH")
 
 ![alt text](imgs/wpu_node.PNG "Way Point Updater")
 
 The Waypoint Updater node shown above as two functions.
-....
-...
 
-![alt text](imgs/placeholder.png "PH")
 
 #### 3.2.1 Waypoint updater
-
+Gets all waypoints from the CSV file + a current pose of the vehicle and outputs the next 200 waypoints ahead of the vehicle.
+![alt text](imgs/waypoint_updater.PNG "Way Point Updater")
 
 ### 3.3 Control
 
@@ -111,15 +102,42 @@ The P, I and D parameters play different roles in the control system:
 
 - P: generatres a steering correction **proportional** to the cross track error (cte). 
 
-![alt text](imgs/placeholder.png "PH")
 
-## 4. Conclusion
 
-![alt text](imgs/placeholder.png "PH")
+## 4. Testing
+Once the car was able to finish one whole track using the standard simulation, we have started the "lot" simulation for testing the maximum angle and the ability to drive a full circle.
+The result implies a properly working DBW node. 
+![alt text](imgs/test_track_sim_low_res.gif "DBW Test")
+
+In addition to that, we have started to test the traffic light detection using a provided rosbag
+![alt text](imgs/rosbag-play.gif "Rosbag play")
+ 
+
+The results revealed that our traffic light detection was not accurate on the carla test track as the light conditions were too poor for the SqueezeNet to detect traffic light colors:
+![alt text](imgs/traffic_light_1.png "Traffic light extracted from the carla rosbag")
+
+Hence, we have implemented a second traffic light status detection algorith using a more analytic approach.
+
+The idea was to identify traffic light states is based on the fact that every active light bulb has a higher illumination and therefore Procedure:
+1. Load image
+2. Convert image into grayscale
+3. Extract a black and white image based on a threshold
+4. Divide b/w image into three parts (representing the light bulbs)
+5. Count the amount of pixes !=0
+5. Compare the amount of white pixels
+6. Derive active traffic light state 
+
+The processing order is shown below
+
+![alt text](imgs/proc.png "TL processing")
+
+For more details refer to 
+https://github.com/robgineer/Traffic_Light_Color_Classifier/blob/master/simple_color_detector.ipynb
+ 
+The result implied a much more accurate traffic light status detection as shown in the resulting LOG output
+![alt text](imgs/roslog.png "ROS LOG")
 
 ## 5. Appendix
-
-![alt text](imgs/placeholder.png "PH")
 
 ### 5.1 ROS Nodes
 
@@ -127,15 +145,14 @@ $ rosnode list
 
 shows following ros nodes:
 
+![alt text](imgs/ros_nodes.png "ROS Nodes")
 
-| Ros node        | Function of node |
-| ------------- |:-------------:| 
-| col 3 is      | right-aligned | 
-| col 2 is      | centered      | 
-| zebra stripes | are neat      | 
 
-![alt text](imgs/placeholder.png "PH")
 
-### 5.2 ROS Topics
+### 4.2 ROS Topics
 
-![alt text](imgs/placeholder.png "PH")
+$ rostopics list
+
+shows following ros topics:
+
+![alt text](imgs/rostopics.png "ROS topics")
