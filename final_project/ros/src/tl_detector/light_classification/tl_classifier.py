@@ -75,10 +75,10 @@ class TLClassifier(object):
                     name_cropped_img = 'cropped_img_'+str(self.iterator_for_test_images)+'.png'
                     cv2.imwrite(name_original_img, image)
                     cv2.imwrite(name_cropped_img, cropped_image)
-                #traffic_light = cv2.resize(cropped_image, (32, 32))
+                traffic_light = cv2.resize(cropped_image, (32, 32))
                 # classsify state
-                #state = self.classify_it(traffic_light)
-                state = self.get_dominant_region(cropped_image)
+                state = self.classify_it(traffic_light)
+                #state = self.get_dominant_region(cropped_image)
                 rospy.loginfo("classified traffic light color: {}".format(state))
                 # traffic light is RED
                 if state == 0:
