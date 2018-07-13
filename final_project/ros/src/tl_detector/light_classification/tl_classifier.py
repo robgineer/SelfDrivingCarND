@@ -79,15 +79,18 @@ class TLClassifier(object):
                 # classsify state
                 state = self.classify_it(traffic_light)
                 #state = self.get_dominant_region(cropped_image)
-                rospy.loginfo("classified traffic light color: {}".format(state))
+                #rospy.loginfo("classified traffic light color: {}".format(state))
                 # traffic light is RED
                 if state == 0:
                     # even if only one traffic light is classified as red, return RED
+                    rospy.loginfo("Traffic Light Status: RED")
                     return TrafficLight.RED
                 # yellow case (less severe)
                 elif state == 2:
+                    rospy.loginfo("Traffic Light Status: YELLOW")
                     return TrafficLight.YELLOW
                 elif state == 1:
+                    rospy.loginfo("Traffic Light Status: GREEN")
                     state = TrafficLight.GREEN
         # returns green only if RED and YELLOW have not been detected in any cropped image
         return state

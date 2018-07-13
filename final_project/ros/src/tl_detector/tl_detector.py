@@ -136,11 +136,11 @@ class TLDetector(object):
             self.last_state = None
             return False
 
-        rospy.loginfo("conversion of camera image")
+        #rospy.loginfo("conversion of camera image")
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         # Get classification
-        rospy.loginfo("calling traffic light classifier")
+        #rospy.loginfo("calling traffic light classifier")
         return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
