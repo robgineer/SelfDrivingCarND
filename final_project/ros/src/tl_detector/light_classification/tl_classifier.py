@@ -86,10 +86,10 @@ class TLClassifier(object):
                     rospy.loginfo("Traffic Light Status: RED")
                     return TrafficLight.RED
                 # yellow case (less severe)
-                elif state == 2:
+                elif state == 1:
                     rospy.loginfo("Traffic Light Status: YELLOW")
                     return TrafficLight.YELLOW
-                elif state == 1:
+                elif state == 2:
                     rospy.loginfo("Traffic Light Status: GREEN")
                     state = TrafficLight.GREEN
         # returns green only if RED and YELLOW have not been detected in any cropped image
